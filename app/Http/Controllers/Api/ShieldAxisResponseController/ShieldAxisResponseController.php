@@ -29,6 +29,10 @@ class ShieldAxisResponseController extends Controller
                         return [
                             'id' => $question->id,
                             'question' => $question->question,
+                            'options' => [
+                                ['value' => true, 'label' => 'Yes'],
+                                ['value' => false, 'label' => 'No']
+                            ]
                         ];
                     }),
                 ];
@@ -52,6 +56,10 @@ class ShieldAxisResponseController extends Controller
                 return [
                     'id' => $question->id,
                     'question' => $question->question,
+                    'options' => [
+                        ['value' => true, 'label' => 'Yes'],
+                        ['value' => false, 'label' => 'No']
+                    ]
                 ];
             }),
         ]);
@@ -79,7 +87,16 @@ class ShieldAxisResponseController extends Controller
                 'id' => $axis->id,
                 'title' => $axis->title,
                 'description' => $axis->description,
-                'questions' => $axis->questions,
+                'questions' => $axis->questions->map(function($question) {
+                    return [
+                        'id' => $question->id,
+                        'question' => $question->question,
+                        'options' => [
+                            ['value' => true, 'label' => 'Yes'],
+                            ['value' => false, 'label' => 'No']
+                        ]
+                    ];
+                }),
             ],
             'response' => $response,
         ]);
@@ -98,7 +115,7 @@ class ShieldAxisResponseController extends Controller
         }
 
         $request->validate([
-            'question_id' => 'required|exists:shield_axis_questions,id',
+            'question_id' => 'required|exists:shield_axes_questions,id',
             'answer' => 'required|in:true,false,1,0',
         ]);
 
@@ -338,42 +355,58 @@ class ShieldAxisResponseController extends Controller
 
     /**
      * Recalculate axis score based on answers (HELPER)
+     * Each question is worth 25% of the axis score
      */
     private function recalculateAxisScore($axisResponse, $axis)
     {
         $answers = is_array($axisResponse->answers) ? $axisResponse->answers : [];
         
-        $totalScore = 0;
+        $totalQuestions = $axis->questions->count();
+        
+        if ($totalQuestions === 0) {
+            $axisResponse->admin_score = 0;
+            return;
+        }
+        
+        // Count how many questions are answered 'true'
+        $trueCount = 0;
         foreach ($axis->questions as $question) {
             $questionId = $question->id;
             if (isset($answers[$questionId]) && $answers[$questionId] === true) {
-                $totalScore += $question->score;
+                $trueCount++;
             }
         }
 
-        $axisResponse->admin_score = $totalScore;
+        // Each question = 25% (100% / 4 questions)
+        $scorePerQuestion = 100 / $totalQuestions;
+        $axisResponse->admin_score = $trueCount * $scorePerQuestion;
     }
 
     /**
      * Calculate and update organization's total score and rank
+     * Total score = average of ALL 4 axes (treating unanswered as 0%)
      */
     private function updateOrganizationScore($organization)
     {
-        // Get all axis responses
-        $responses = ShieldAxisResponse::where('organization_id', $organization->id)->get();
-
-        if ($responses->isEmpty()) {
+        // Get total number of axes in the system
+        $totalAxes = ShieldAxis::count();
+        
+        if ($totalAxes === 0) {
             $organization->shield_percentage = 0;
             $organization->shield_rank = null;
-        } else {
-            // Sum all axis scores
-            $totalScore = $responses->sum('admin_score');
-            
-            // Calculate percentage (assuming each axis max is 25 points for 4 questions)
-            // Total possible = 25 * 4 axes = 100 points
-            $maxPossibleScore = 100;
-            $organization->shield_percentage = ($totalScore / $maxPossibleScore) * 100;
+            $organization->save();
+            return;
         }
+
+        // Get all axis responses for this organization
+        $responses = ShieldAxisResponse::where('organization_id', $organization->id)->get();
+
+        // Sum all completed axis scores
+        $totalScore = $responses->sum('admin_score');
+        
+        // Calculate average based on ALL axes (not just completed ones)
+        // Unanswered axes count as 0%
+        $organization->shield_percentage = $totalScore / $totalAxes;
 
         // Determine rank based on percentage
         $percentage = $organization->shield_percentage;
@@ -415,7 +448,7 @@ class ShieldAxisResponseController extends Controller
                     'axis_id' => $response->shield_axis_id,
                     'axis_title' => $response->axis->title,
                     'score' => $response->admin_score,
-                    'max_score' => $response->axis->questions->sum('score'),
+                    'max_score' => 100, // Each axis max is always 100%
                     'answers' => $response->answers,
                 ];
             }),
