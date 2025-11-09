@@ -47,7 +47,6 @@ Get all axes	GET	/api/axes
 Get one axis	GET	/api/axes/{axisId}
 Get org shield status	GET	/api/organizations/{orgId}/shield-status
 Get org axis responses	GET	/api/organizations/{orgId}/axes/{axisId}
-Save single answer	POST	/api/organizations/{orgId}/axes/{axisId}/answer
 Save bulk answers	POST	/api/organizations/{orgId}/axes/{axisId}
 Upload attachment	POST	/api/organizations/{orgId}/axes/{axisId}/attachment
 Delete attachment	DELETE	/api/organizations/{orgId}/axes/{axisId}/attachment/{attachmentNumber}
