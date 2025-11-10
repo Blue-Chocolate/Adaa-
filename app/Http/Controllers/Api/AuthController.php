@@ -3,35 +3,78 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\Auth\RegisterRequest;
-use App\Services\AuthService;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use App\Models\User;
+use Exception;
 
 class AuthController extends Controller
 {
-    public function __construct(
-        private AuthService $authService
-    ) {}
-
-    public function register(RegisterRequest $request): JsonResponse
+    // Register
+    public function register(Request $request)
     {
-        $result = $this->authService->register($request->validated());
-        
-        return response()->json($result['data'], $result['status']);
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users',
+                'phone' => 'required|string|unique:users',
+                'password' => 'required|min:6',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'password' => Hash::make($request->password),
+                'user_priviliges' => 'user',
+            ]);
+
+            return response()->json(['message' => 'User registered successfully', 'user' => $user], 201);
+        } catch (Exception $e) {
+            return response()->json(['error' => 'Registration failed', 'details' => $e->getMessage()], 500);
+        }
     }
 
-    public function login(LoginRequest $request): JsonResponse
+    // Login
+    public function login(Request $request)
     {
-        $result = $this->authService->login($request->validated());
-        
-        return response()->json($result['data'], $result['status']);
+        try {
+            $validator = Validator::make($request->all(), [
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $user = User::where('email', $request->email)->first();
+
+            if (!$user || !Hash::check($request->password, $user->password)) {
+                return response()->json(['error' => 'Invalid credentials'], 401);
+            }
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json(['message' => 'Login successful', 'token' => $token, 'user' => $user], 200);
+        } catch (Exception $e) {
+            return response()->json(['error' => 'Login failed', 'details' => $e->getMessage()], 500);
+        }
     }
 
-    public function logout(): JsonResponse
+    // Logout
+    public function logout(Request $request)
     {
-        $result = $this->authService->logout(auth()->user());
-        
-        return response()->json($result['data'], $result['status']);
+        try {
+            $request->user()->currentAccessToken()->delete();
+            return response()->json(['message' => 'Logged out successfully'], 200);
+        } catch (Exception $e) {
+            return response()->json(['error' => 'Logout failed', 'details' => $e->getMessage()], 500);
+        }
     }
 }
