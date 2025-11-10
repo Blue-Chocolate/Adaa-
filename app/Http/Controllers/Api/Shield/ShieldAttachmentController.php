@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Api\Shield;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class ShieldAttachmentController extends Controller
 {
     /**
      * POST /api/shield/attachment/upload
-     * Upload single attachment file
+     * Upload up to 3 attachment files
      */
     public function upload(Request $request)
     {
@@ -26,29 +27,36 @@ class ShieldAttachmentController extends Controller
             ], 404);
         }
 
+        // Validate request
         $request->validate([
-            'file' => 'required|file|mimes:pdf,docx,doc,jpg,jpeg,png,xlsx,xls|max:10240', // 10MB max
+            'files' => 'required|array|max:3', // accept up to 3 files
+            'files.*' => 'file|mimes:pdf,docx,doc,jpg,jpeg,png,xlsx,xls|max:10240', // each file max 10MB
         ]);
 
+        $uploadedFiles = [];
+
         try {
-            // Store file
-            $path = $request->file('file')->store(
-                "shield_attachments/{$organization->id}",
-                'public'
-            );
-            
-            $fileUrl = \Storage::disk('public')->url($path);
+            foreach ($request->file('files') as $file) {
+                $path = $file->store(
+                    "shield_attachments/{$organization->id}",
+                    'public'
+                );
+                
+                $uploadedFiles[] = [
+                    'file_url' => Storage::disk('public')->url($path),
+                    'file_path' => $path
+                ];
+            }
 
             return response()->json([
                 'success' => true,
-                'file_url' => $fileUrl,
-                'file_path' => $path, // Internal path for storage
+                'files' => $uploadedFiles,
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload file: ' . $e->getMessage()
+                'message' => 'Failed to upload files: ' . $e->getMessage()
             ], 500);
         }
     }

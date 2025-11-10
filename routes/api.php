@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+// use App\Http\Controllers\Api\Auth\EmailVerificationController;
+use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\OrganizationController\OrganizationController;
 use App\Http\Controllers\Api\PodcastController\PodcastController;
 use App\Http\Controllers\Api\ReleaseController\ReleaseController;
@@ -23,7 +25,10 @@ use App\Http\Controllers\Api\Shield\ShieldDownloadController;
 */
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::get('/email/verify', [AuthController::class, 'verifyEmail']);
+Route::post('/email/resend', [AuthController::class, 'resendVerification']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+
 
 /*
 |--------------------------------------------------------------------------
@@ -97,5 +102,8 @@ Route::middleware('auth:sanctum')->prefix('shield')->group(function () {
     
     // Download - Generate and download PDF results
     Route::get('/download-results', [ShieldDownloadController::class, 'downloadResults']);
+
+    Route::post('/shield/upload-attachment', [ShieldSubmissionController::class, 'uploadAttachment']);
+
 });
 

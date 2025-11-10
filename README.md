@@ -109,17 +109,29 @@ Authorization: Bearer {your_token}
 Content-Type: application/json
 
 {
-  "answers": [
+  "axis_id": 1,
+  "questions": [
     {
       "question_id": 1,
-      "answer": true,
-      "attachment": null
+      "answer": true
     },
     {
       "question_id": 2,
-      "answer": null,
-      "attachment": null
+      "answer": false
+    },
+    {
+      "question_id": 3,
+      "answer": true
+    },
+    {
+      "question_id": 4,
+      "answer": true
     }
+  ],
+  "attachments": [
+    "https://your-domain.com/storage/uploads/axis1-doc1.pdf",
+    "https://your-domain.com/storage/uploads/axis1-doc2.pdf",
+    "https://your-domain.com/storage/uploads/axis1-doc3.pdf"
   ]
 }
 ```
@@ -150,8 +162,10 @@ curl -X POST http://your-domain/api/shield/attachment/upload \
 - URL: `/api/shield/attachment/upload`
 - Headers: `Authorization: Bearer {token}`
 - Body: form-data
-  - Key: `file`
-  - Value: Select file (PDF, DOCX, JPG, PNG, etc.)
+-Key: files[]   Value: file1.pdf
+-Key: files[]   Value: file2.pdf
+-Key: files[]   Value: file3.pdf
+
 
 **Expected Response:**
 ```json
@@ -173,29 +187,30 @@ curl -X POST http://your-domain/api/shield/attachment/upload \
 POST /api/shield/submit
 Authorization: Bearer {your_token}
 Content-Type: application/json
-
 {
-  "answers": [
+  "axis_id": 1,
+  "questions": [
     {
       "question_id": 1,
-      "answer": true,
-      "attachment": "http://example.com/storage/shield_attachments/1/policy.pdf"
+      "answer": true
     },
     {
       "question_id": 2,
-      "answer": false,
-      "attachment": null
+      "answer": false
     },
     {
       "question_id": 3,
-      "answer": true,
-      "attachment": null
+      "answer": true
     },
     {
       "question_id": 4,
-      "answer": true,
-      "attachment": null
+      "answer": true
     }
+  ],
+  "attachments": [
+    "https://your-domain.com/storage/uploads/axis1-doc1.pdf",
+    "https://your-domain.com/storage/uploads/axis1-doc2.pdf",
+    "https://your-domain.com/storage/uploads/axis1-doc3.pdf"
   ]
 }
 ```
@@ -303,7 +318,7 @@ GET /api/releases
 **Endpoint:** `GET /api/releases/{id}`
 
 **Test Request:**
-```bash
+```bashs
 GET /api/releases/1
 ```
 
@@ -438,11 +453,29 @@ POST /api/shield/submit
 Authorization: Bearer {token}
 
 {
-  "answers": [
-    {"question_id": 1, "answer": true, "attachment": null},
-    {"question_id": 2, "answer": false, "attachment": null},
-    {"question_id": 3, "answer": true, "attachment": null},
-    {"question_id": 4, "answer": true, "attachment": null}
+  "axis_id": 1,
+  "questions": [
+    {
+      "question_id": 1,
+      "answer": true
+    },
+    {
+      "question_id": 2,
+      "answer": false
+    },
+    {
+      "question_id": 3,
+      "answer": true
+    },
+    {
+      "question_id": 4,
+      "answer": true
+    }
+  ],
+  "attachments": [
+    "https://your-domain.com/storage/uploads/axis1-doc1.pdf",
+    "https://your-domain.com/storage/uploads/axis1-doc2.pdf",
+    "https://your-domain.com/storage/uploads/axis1-doc3.pdf"
   ]
 }
 ```
