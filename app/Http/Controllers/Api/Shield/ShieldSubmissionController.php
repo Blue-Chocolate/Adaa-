@@ -14,7 +14,7 @@ class ShieldSubmissionController extends Controller
 {
     /**
      * POST /api/shield/submit
-     * Submit all answers at once
+     * Submit all answers at once (4 axes × 4 questions + 3 attachments per axis)
      */
     public function submit(Request $request)
     {
@@ -31,38 +31,29 @@ class ShieldSubmissionController extends Controller
         }
 
         $request->validate([
-            'answers' => 'required|array',
-            'answers.*.question_id' => 'required|exists:shield_axes_questions,id',
-            'answers.*.answer' => 'required|boolean',
-            'answers.*.attachment' => 'nullable|string', // URL from previous upload
+            'submissions' => 'required|array|min:1',
+            'submissions.*.axis_id' => 'required|exists:shield_axes,id',
+            'submissions.*.questions' => 'required|array|min:1',
+            'submissions.*.questions.*.question_id' => 'required|exists:shield_axes_questions,id',
+            'submissions.*.questions.*.answer' => 'required|boolean',
+            'submissions.*.attachments' => 'nullable|array|max:3',
+            'submissions.*.attachments.*' => 'nullable|string', // URLs from previous upload
         ]);
 
         DB::beginTransaction();
         
         try {
-            // Group answers by axis
-            $answersByAxis = [];
-            
-            foreach ($request->answers as $answerData) {
-                $questionId = $answerData['question_id'];
-                
-                // Find which axis this question belongs to
-                $question = \App\Models\ShieldAxisQuestion::findOrFail($questionId);
-                $axisId = $question->shield_axis_id;
-                
-                if (!isset($answersByAxis[$axisId])) {
-                    $answersByAxis[$axisId] = [];
-                }
-                
-                $answersByAxis[$axisId][$questionId] = [
-                    'answer' => $answerData['answer'],
-                    'attachment' => $answerData['attachment'] ?? null,
-                ];
-            }
-
-            // Save responses for each axis
-            foreach ($answersByAxis as $axisId => $answers) {
+            foreach ($request->submissions as $submission) {
+                $axisId = $submission['axis_id'];
                 $axis = ShieldAxis::with('questions')->findOrFail($axisId);
+                
+                // Verify all questions belong to this axis
+                foreach ($submission['questions'] as $questionData) {
+                    $question = \App\Models\ShieldAxisQuestion::findOrFail($questionData['question_id']);
+                    if ($question->shield_axis_id != $axisId) {
+                        throw new \Exception("Question {$questionData['question_id']} does not belong to axis {$axisId}");
+                    }
+                }
                 
                 // Find or create response
                 $axisResponse = ShieldAxisResponse::firstOrCreate(
@@ -79,15 +70,19 @@ class ShieldSubmissionController extends Controller
                 // Get existing answers
                 $existingAnswers = is_array($axisResponse->answers) ? $axisResponse->answers : [];
                 
-                // Merge new answers
-                foreach ($answers as $questionId => $answerData) {
-                    $existingAnswers[$questionId] = $answerData['answer'];
-                    
-                    // Handle attachment if provided
-                    if ($answerData['attachment']) {
-                        // Extract path from URL if needed
-                        $path = str_replace(\Storage::disk('public')->url(''), '', $answerData['attachment']);
-                        $existingAnswers["attachment_1"] = $path;
+                // Save question answers
+                foreach ($submission['questions'] as $questionData) {
+                    $existingAnswers[$questionData['question_id']] = $questionData['answer'];
+                }
+                
+                // Save attachments (3 per axis)
+                if (isset($submission['attachments']) && is_array($submission['attachments'])) {
+                    foreach ($submission['attachments'] as $index => $attachment) {
+                        if ($attachment) {
+                            // Extract path from URL if needed
+                            $path = str_replace(\Storage::disk('public')->url(''), '', $attachment);
+                            $existingAnswers["attachment_" . ($index + 1)] = $path;
+                        }
                     }
                 }
                 
@@ -105,7 +100,7 @@ class ShieldSubmissionController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Answers submitted successfully',
+                'message' => 'All submissions saved successfully',
                 'total_score' => round($organization->fresh()->shield_percentage, 2),
                 'rank' => $organization->fresh()->shield_rank,
             ]);

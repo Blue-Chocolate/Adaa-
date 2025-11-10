@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+// use App\Http\Controllers\Api\Auth\EmailVerificationController;
+use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\OrganizationController\OrganizationController;
 use App\Http\Controllers\Api\PodcastController\PodcastController;
 use App\Http\Controllers\Api\ReleaseController\ReleaseController;
@@ -23,6 +25,8 @@ use App\Http\Controllers\Api\Shield\ShieldDownloadController;
 */
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::get('email/verify', [EmailVerificationController::class, 'verifyEmail']);
+Route::post('email/resend', [EmailVerificationController::class, 'resendVerification']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
 /*
