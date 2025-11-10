@@ -12,18 +12,18 @@ class ShieldQuestionsController extends Controller
 {
     /**
      * GET /api/shield/questions
-     * Get all axes with questions and user's current answers
+     * Get all axes with questions and user's saved answers
      */
     public function index(Request $request)
     {
         $user = Auth::user();
         
-        // Get user's organization (assuming user has one organization)
+        // Get user's organization
         $organization = $user->organizations()->first();
 
         $axes = ShieldAxis::with('questions')->get();
 
-        // Get all user's responses if organization exists
+        // Get all user's saved responses if organization exists
         $userResponses = [];
         if ($organization) {
             $responses = ShieldAxisResponse::where('organization_id', $organization->id)->get();
@@ -40,6 +40,7 @@ class ShieldQuestionsController extends Controller
                 return [
                     'id' => (string) $axis->id,
                     'title' => $axis->title,
+                    'description' => $axis->description ?? '',
                     'questions' => $axis->questions->map(function($question) use ($axisAnswers) {
                         $questionId = (string) $question->id;
                         

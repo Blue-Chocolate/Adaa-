@@ -4,363 +4,266 @@ namespace App\Http\Controllers\Api\ShieldAxisResponseController;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Organization;
 use App\Models\ShieldAxis;
 use App\Models\ShieldAxisResponse;
-use App\Models\ShieldAxisQuestion;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ShieldAxisResponseController extends Controller
 {
     /**
-     * Get all axes with their questions
+     * GET /api/axes
+     * Get all axes with questions
      */
-    public function getAxes()
+    public function index()
     {
         $axes = ShieldAxis::with('questions')->get();
 
         return response()->json([
-            'axes' => $axes->map(function($axis) {
-                return [
-                    'id' => $axis->id,
-                    'title' => $axis->title,
-                    'description' => $axis->description,
-                    'questions' => $axis->questions->map(function($question) {
-                        return [
-                            'id' => $question->id,
-                            'question' => $question->question,
-                            'options' => [
-                                ['value' => true, 'label' => 'Yes'],
-                                ['value' => false, 'label' => 'No']
-                            ]
-                        ];
-                    }),
-                ];
-            }),
+            'success' => true,
+            'axes' => $axes->map(fn($axis) => [
+                'id' => $axis->id,
+                'title' => $axis->title,
+                'description' => $axis->description,
+                'questions' => $axis->questions->map(fn($q) => [
+                    'id' => $q->id,
+                    'question' => $q->question,
+                ]),
+            ]),
         ]);
     }
 
     /**
-     * Get specific axis with questions
+     * GET /api/axes/{axisId}
+     * Get specific axis with questions and user's answers
      */
-    public function getAxis($axisId)
+    public function show($axisId)
     {
-        $axis = ShieldAxis::with('questions')->findOrFail($axisId);
-
-        return response()->json([
-            'id' => $axis->id,
-            'title' => $axis->title,
-            'description' => $axis->description,
-            'weight' => $axis->weight,
-            'questions' => $axis->questions->map(function($question) {
-                return [
-                    'id' => $question->id,
-                    'question' => $question->question,
-                    'options' => [
-                        ['value' => true, 'label' => 'Yes'],
-                        ['value' => false, 'label' => 'No']
-                    ]
-                ];
-            }),
-        ]);
-    }
-
-    /**
-     * Get organization's response for a specific axis
-     */
-    public function show($orgId, $axisId)
-    {
-        $organization = Organization::findOrFail($orgId);
-
-        if ($organization->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
+        $organization = $this->getUserOrganization();
         $axis = ShieldAxis::with('questions')->findOrFail($axisId);
         
-        $response = ShieldAxisResponse::where('organization_id', $orgId)
+        $response = ShieldAxisResponse::where('organization_id', $organization->id)
             ->where('shield_axis_id', $axisId)
             ->first();
 
         return response()->json([
+            'success' => true,
             'axis' => [
                 'id' => $axis->id,
                 'title' => $axis->title,
                 'description' => $axis->description,
-                'questions' => $axis->questions->map(function($question) {
-                    return [
-                        'id' => $question->id,
-                        'question' => $question->question,
-                        'options' => [
-                            ['value' => true, 'label' => 'Yes'],
-                            ['value' => false, 'label' => 'No']
-                        ]
-                    ];
-                }),
+                'questions' => $axis->questions->map(fn($q) => [
+                    'id' => $q->id,
+                    'question' => $q->question,
+                ]),
             ],
-            'response' => $response,
+            'answers' => $response?->answers ?? [],
+            'score' => $response?->admin_score ?? 0,
         ]);
     }
 
     /**
-     * Save single answer instantly (NEW)
-     * POST /api/organizations/{orgId}/axes/{axisId}/answer
+     * POST /api/axes/{axisId}/answer
+     * Save single answer instantly
      */
-    public function saveAnswer(Request $request, $orgId, $axisId)
+    public function saveAnswer(Request $request, $axisId)
     {
-        $organization = Organization::findOrFail($orgId);
-
-        if ($organization->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $organization = $this->getUserOrganization();
+        $axis = ShieldAxis::with('questions')->findOrFail($axisId);
 
         $request->validate([
             'question_id' => 'required|exists:shield_axes_questions,id',
-            'answer' => 'required|in:true,false,1,0',
+            'answer' => 'required|boolean',
         ]);
 
-        $axis = ShieldAxis::with('questions')->findOrFail($axisId);
-        
         // Verify question belongs to this axis
-        $question = $axis->questions->firstWhere('id', $request->question_id);
-        if (!$question) {
-            return response()->json(['message' => 'Question does not belong to this axis'], 422);
+        if (!$axis->questions->contains('id', $request->question_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Question does not belong to this axis'
+            ], 422);
         }
 
-        // Find or create response
-        $axisResponse = ShieldAxisResponse::firstOrCreate(
-            [
-                'organization_id' => $orgId,
-                'shield_axis_id' => $axisId,
-            ],
-            [
-                'answers' => [],
-                'admin_score' => 0,
-            ]
-        );
+        DB::beginTransaction();
+        try {
+            $axisResponse = ShieldAxisResponse::firstOrCreate(
+                [
+                    'organization_id' => $organization->id,
+                    'shield_axis_id' => $axisId,
+                ],
+                ['answers' => [], 'admin_score' => 0]
+            );
 
-        // Get existing answers
-        $answers = is_array($axisResponse->answers) ? $axisResponse->answers : [];
-        
-        // Update the specific answer
-        $answers[$request->question_id] = filter_var($request->answer, FILTER_VALIDATE_BOOLEAN);
-        
-        // Save answers
-        $axisResponse->answers = $answers;
-        
-        // Recalculate score
-        $this->recalculateAxisScore($axisResponse, $axis);
-        
-        $axisResponse->save();
+            $answers = is_array($axisResponse->answers) ? $axisResponse->answers : [];
+            $answers[$request->question_id] = $request->answer;
+            $axisResponse->answers = $answers;
+            
+            $this->recalculateScore($axisResponse, $axis);
+            $axisResponse->save();
+            
+            $this->updateOrganizationScore($organization);
+            
+            DB::commit();
 
-        // Update organization's total score
-        $this->updateOrganizationScore($organization);
-
-        return response()->json([
-            'message' => 'Answer saved successfully',
-            'question_id' => $request->question_id,
-            'answer' => $answers[$request->question_id],
-            'axis_score' => $axisResponse->admin_score,
-            'total_score' => $organization->fresh()->shield_percentage,
-            'rank' => $organization->fresh()->shield_rank,
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Answer saved successfully',
+                'axis_score' => $axisResponse->admin_score,
+                'total_score' => round($organization->fresh()->shield_percentage, 2),
+                'rank' => $organization->fresh()->shield_rank,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 
     /**
-     * Upload single attachment instantly (NEW)
-     * POST /api/organizations/{orgId}/axes/{axisId}/attachment
+     * POST /api/axes/{axisId}/attachment
+     * Upload single attachment
      */
-    public function uploadAttachment(Request $request, $orgId, $axisId)
+    public function uploadAttachment(Request $request, $axisId)
     {
-        $organization = Organization::findOrFail($orgId);
-
-        if ($organization->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $organization = $this->getUserOrganization();
 
         $request->validate([
-            'attachment' => 'required|file|mimes:pdf,docx,jpg,png,xlsx|max:10240',
+            'attachment' => 'required|file|mimes:pdf,docx,doc,jpg,jpeg,png,xlsx,xls|max:10240',
             'attachment_number' => 'required|in:1,2,3',
         ]);
 
-        $axis = ShieldAxis::findOrFail($axisId);
-
-        // Find or create response
         $axisResponse = ShieldAxisResponse::firstOrCreate(
             [
-                'organization_id' => $orgId,
+                'organization_id' => $organization->id,
                 'shield_axis_id' => $axisId,
             ],
-            [
-                'answers' => [],
-                'admin_score' => 0,
-            ]
+            ['answers' => [], 'admin_score' => 0]
         );
 
-        // Get existing answers
         $answers = is_array($axisResponse->answers) ? $axisResponse->answers : [];
-        
-        $attachmentField = 'attachment_' . $request->attachment_number;
+        $field = 'attachment_' . $request->attachment_number;
         
         // Delete old file if exists
-        if (isset($answers[$attachmentField])) {
-            \Storage::disk('public')->delete($answers[$attachmentField]);
+        if (isset($answers[$field])) {
+            \Storage::disk('public')->delete($answers[$field]);
         }
         
         // Store new file
         $path = $request->file('attachment')->store(
-            "axes_attachments/{$orgId}/{$axisId}",
+            "axes_attachments/{$organization->id}/{$axisId}",
             'public'
         );
         
-        $answers[$attachmentField] = $path;
-        
-        // Save answers
+        $answers[$field] = $path;
         $axisResponse->answers = $answers;
         $axisResponse->save();
 
         return response()->json([
+            'success' => true,
             'message' => 'Attachment uploaded successfully',
             'attachment_number' => $request->attachment_number,
-            'path' => $path,
             'url' => \Storage::disk('public')->url($path),
         ]);
     }
 
     /**
-     * Delete attachment (NEW)
-     * DELETE /api/organizations/{orgId}/axes/{axisId}/attachment/{number}
+     * DELETE /api/axes/{axisId}/attachment/{number}
+     * Delete attachment
      */
-    public function deleteAttachment($orgId, $axisId, $attachmentNumber)
+    public function deleteAttachment($axisId, $attachmentNumber)
     {
-        $organization = Organization::findOrFail($orgId);
-
-        if ($organization->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $organization = $this->getUserOrganization();
 
         if (!in_array($attachmentNumber, [1, 2, 3])) {
-            return response()->json(['message' => 'Invalid attachment number'], 422);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid attachment number'
+            ], 422);
         }
 
-        $axisResponse = ShieldAxisResponse::where('organization_id', $orgId)
+        $axisResponse = ShieldAxisResponse::where('organization_id', $organization->id)
             ->where('shield_axis_id', $axisId)
             ->first();
 
         if (!$axisResponse) {
-            return response()->json(['message' => 'No response found'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'No response found'
+            ], 404);
         }
 
         $answers = is_array($axisResponse->answers) ? $axisResponse->answers : [];
-        $attachmentField = 'attachment_' . $attachmentNumber;
+        $field = 'attachment_' . $attachmentNumber;
 
-        if (isset($answers[$attachmentField])) {
-            // Delete file from storage
-            \Storage::disk('public')->delete($answers[$attachmentField]);
-            
-            // Remove from answers array
-            unset($answers[$attachmentField]);
-            
-            // Save
-            $axisResponse->answers = $answers;
-            $axisResponse->save();
-
+        if (!isset($answers[$field])) {
             return response()->json([
-                'message' => 'Attachment deleted successfully',
-            ]);
+                'success' => false,
+                'message' => 'Attachment not found'
+            ], 404);
         }
 
-        return response()->json(['message' => 'Attachment not found'], 404);
-    }
-
-    /**
-     * Save or update axis answers (BULK - Keep for backward compatibility)
-     */
-    public function storeOrUpdate(Request $request, $orgId, $axisId)
-    {
-        $organization = Organization::findOrFail($orgId);
-
-        if ($organization->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $axis = ShieldAxis::with('questions')->findOrFail($axisId);
-
-        // Build dynamic validation rules based on questions
-        $rules = [];
-        foreach ($axis->questions as $question) {
-            $rules["answers.{$question->id}"] = 'required|in:true,false,1,0';
-        }
+        \Storage::disk('public')->delete($answers[$field]);
+        unset($answers[$field]);
         
-        $rules['attachment_1'] = 'nullable|file|mimes:pdf,docx,jpg,png,xlsx|max:10240';
-        $rules['attachment_2'] = 'nullable|file|mimes:pdf,docx,jpg,png,xlsx|max:10240';
-        $rules['attachment_3'] = 'nullable|file|mimes:pdf,docx,jpg,png,xlsx|max:10240';
-
-        $request->validate($rules);
-
-        // Find or create response
-        $axisResponse = ShieldAxisResponse::firstOrNew([
-            'organization_id' => $orgId,
-            'shield_axis_id' => $axisId,
-        ]);
-
-        // Convert string booleans to actual booleans
-        $answers = [];
-        foreach ($request->input('answers', []) as $questionId => $value) {
-            $answers[$questionId] = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        }
-        
-        // Keep existing data if they exist
-        $existingAnswers = is_array($axisResponse->answers) ? $axisResponse->answers : [];
-        
-        // Merge new answers with existing data
-        $mergedAnswers = array_merge($existingAnswers, $answers);
-
-        // Handle file uploads
-        foreach (['attachment_1', 'attachment_2', 'attachment_3'] as $field) {
-            if ($request->hasFile($field)) {
-                // Delete old file if exists
-                if (isset($mergedAnswers[$field])) {
-                    \Storage::disk('public')->delete($mergedAnswers[$field]);
-                }
-                
-                // Store new file
-                $path = $request->file($field)->store(
-                    "axes_attachments/{$orgId}/{$axisId}",
-                    'public'
-                );
-                
-                $mergedAnswers[$field] = $path;
-            }
-        }
-        
-        // Save the complete merged answers array
-        $axisResponse->answers = $mergedAnswers;
-
-        // Recalculate score
-        $this->recalculateAxisScore($axisResponse, $axis);
-        
+        $axisResponse->answers = $answers;
         $axisResponse->save();
 
-        // Recalculate organization's total score
-        $this->updateOrganizationScore($organization);
-
         return response()->json([
-            'message' => 'Response saved successfully',
-            'axis_score' => $axisResponse->admin_score,
-            'total_score' => $organization->fresh()->shield_percentage,
-            'rank' => $organization->fresh()->shield_rank,
+            'success' => true,
+            'message' => 'Attachment deleted successfully',
         ]);
     }
 
     /**
-     * Recalculate axis score based on answers (HELPER)
-     * Each question is worth 25% of the axis score
+     * GET /api/shield-status
+     * Get organization's overall shield status
      */
-    private function recalculateAxisScore($axisResponse, $axis)
+    public function getStatus()
+    {
+        $organization = $this->getUserOrganization();
+
+        $responses = ShieldAxisResponse::where('organization_id', $organization->id)
+            ->with('axis')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'organization' => [
+                'id' => $organization->id,
+                'name' => $organization->name,
+                'score' => round($organization->shield_percentage, 2),
+                'rank' => $organization->shield_rank,
+            ],
+            'axes_completed' => $responses->count(),
+            'total_axes' => ShieldAxis::count(),
+            'axis_details' => $responses->map(fn($r) => [
+                'axis_id' => $r->shield_axis_id,
+                'axis_title' => $r->axis->title,
+                'score' => round($r->admin_score, 2),
+                'answers' => $r->answers,
+            ]),
+        ]);
+    }
+
+    /**
+     * Helper: Get authenticated user's organization
+     */
+    private function getUserOrganization()
+    {
+        $organization = Auth::user()->organizations()->first();
+        
+        if (!$organization) {
+            abort(404, 'No organization found for this user');
+        }
+        
+        return $organization;
+    }
+
+    /**
+     * Helper: Recalculate axis score
+     */
+    private function recalculateScore($axisResponse, $axis)
     {
         $answers = is_array($axisResponse->answers) ? $axisResponse->answers : [];
-        
         $totalQuestions = $axis->questions->count();
         
         if ($totalQuestions === 0) {
@@ -368,27 +271,18 @@ class ShieldAxisResponseController extends Controller
             return;
         }
         
-        // Count how many questions are answered 'true'
-        $trueCount = 0;
-        foreach ($axis->questions as $question) {
-            $questionId = $question->id;
-            if (isset($answers[$questionId]) && $answers[$questionId] === true) {
-                $trueCount++;
-            }
-        }
+        $trueCount = $axis->questions->filter(fn($q) => 
+            isset($answers[$q->id]) && $answers[$q->id] === true
+        )->count();
 
-        // Each question = 25% (100% / 4 questions)
-        $scorePerQuestion = 100 / $totalQuestions;
-        $axisResponse->admin_score = $trueCount * $scorePerQuestion;
+        $axisResponse->admin_score = ($trueCount / $totalQuestions) * 100;
     }
 
     /**
-     * Calculate and update organization's total score and rank
-     * Total score = average of ALL 4 axes (treating unanswered as 0%)
+     * Helper: Update organization's total score and rank
      */
     private function updateOrganizationScore($organization)
     {
-        // Get total number of axes in the system
         $totalAxes = ShieldAxis::count();
         
         if ($totalAxes === 0) {
@@ -398,60 +292,19 @@ class ShieldAxisResponseController extends Controller
             return;
         }
 
-        // Get all axis responses for this organization
         $responses = ShieldAxisResponse::where('organization_id', $organization->id)->get();
-
-        // Sum all completed axis scores
         $totalScore = $responses->sum('admin_score');
         
-        // Calculate average based on ALL axes (not just completed ones)
-        // Unanswered axes count as 0%
         $organization->shield_percentage = $totalScore / $totalAxes;
 
-        // Determine rank based on percentage
         $percentage = $organization->shield_percentage;
-        
-        if ($percentage >= 90) {
-            $organization->shield_rank = 'gold';
-        } elseif ($percentage >= 70) {
-            $organization->shield_rank = 'silver';
-        } elseif ($percentage >= 50) {
-            $organization->shield_rank = 'bronze';
-        } else {
-            $organization->shield_rank = null;
-        }
+        $organization->shield_rank = match(true) {
+            $percentage >= 90 => 'gold',
+            $percentage >= 70 => 'silver',
+            $percentage >= 50 => 'bronze',
+            default => null,
+        };
 
         $organization->save();
-    }
-
-    /**
-     * Get organization's overall shield status
-     */
-    public function getOverallStatus($orgId)
-    {
-        $organization = Organization::findOrFail($orgId);
-
-        if ($organization->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $responses = ShieldAxisResponse::where('organization_id', $orgId)
-            ->with('axis.questions')
-            ->get();
-
-        return response()->json([
-            'organization' => $organization->only(['id', 'name', 'shield_percentage', 'shield_rank']),
-            'axes_completed' => $responses->count(),
-            'total_axes' => ShieldAxis::count(),
-            'axis_details' => $responses->map(function($response) {
-                return [
-                    'axis_id' => $response->shield_axis_id,
-                    'axis_title' => $response->axis->title,
-                    'score' => $response->admin_score,
-                    'max_score' => 100, // Each axis max is always 100%
-                    'answers' => $response->answers,
-                ];
-            }),
-        ]);
     }
 }
