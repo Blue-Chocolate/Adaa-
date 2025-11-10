@@ -176,4 +176,18 @@ class ShieldSubmissionController extends Controller
 
         $organization->save();
     }
+    public function uploadAttachment(Request $request)
+{
+    $request->validate([
+        'file' => 'required|file|max:10240', // 10MB max
+    ]);
+
+    $path = $request->file('file')->store('shield/attachments', 'public');
+    
+    return response()->json([
+        'success' => true,
+        'url' => $path,
+        'full_url' => \Storage::disk('public')->url($path)
+    ]);
+}
 }

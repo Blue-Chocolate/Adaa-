@@ -25,9 +25,10 @@ use App\Http\Controllers\Api\Shield\ShieldDownloadController;
 */
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
-Route::get('email/verify', [EmailVerificationController::class, 'verifyEmail']);
-Route::post('email/resend', [EmailVerificationController::class, 'resendVerification']);
+Route::get('/email/verify', [AuthController::class, 'verifyEmail']);
+Route::post('/email/resend', [AuthController::class, 'resendVerification']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+
 
 /*
 |--------------------------------------------------------------------------
@@ -101,5 +102,8 @@ Route::middleware('auth:sanctum')->prefix('shield')->group(function () {
     
     // Download - Generate and download PDF results
     Route::get('/download-results', [ShieldDownloadController::class, 'downloadResults']);
+
+    Route::post('/shield/upload-attachment', [ShieldSubmissionController::class, 'uploadAttachment']);
+
 });
 

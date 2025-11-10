@@ -20,17 +20,15 @@ class AuthController extends Controller
      * Send verification email to a user (call this after registration)
      */
     protected function sendVerificationEmail(User $user)
-    {
-        // generate token
-        $token = Str::random(64);
+{
+    $token = Str::random(64);
 
-        // save token and created_at to users table (or to separate table if prefer)
-        $user->email_verification_token = $token;
-        $user->save();
+    $user->email_verification_token = $token;
+    $user->email_verification_sent_at = now(); // track when sent
+    $user->save();
 
-        // send email (sync) - can queue later
-        Mail::to($user->email)->send(new VerifyEmailMail($user, $token));
-    }
+    Mail::to($user->email)->send(new VerifyEmailMail($user, $token));
+}
 
     /**
      * GET /api/email/verify?token=...
