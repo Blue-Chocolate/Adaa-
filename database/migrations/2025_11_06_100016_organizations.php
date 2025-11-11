@@ -31,6 +31,8 @@ Schema::create('organizations', function (Blueprint $table) {
     $table->decimal('shield_percentage', 5, 2)->nullable()->comment('Percentage determining the honorary shield level');
     $table->enum('shield_rank', ['bronze', 'silver', 'gold', 'diamond'])->nullable()->comment('Honorary shield rank based on percentage');
 
+    
+
     $table->timestamps();
 });
 
