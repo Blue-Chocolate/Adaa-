@@ -11,6 +11,10 @@ use Illuminate\Http\JsonResponse;
 use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+
 
 class AuthController extends Controller
 {
@@ -146,6 +150,84 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'Logout failed',
                 'error' => config('app.debug') ? $e->getMessage() : 'An unexpected error occurred'
+            ], 500);
+        }
+    }
+     public function me(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            // Single query to join users + organizations
+            $data = DB::table('users')
+                ->leftJoin('organizations', 'users.id', '=', 'organizations.user_id')
+                ->where('users.id', $user->id)
+                ->select(
+                    'users.id',
+                    'users.first_name',
+                    'users.last_name',
+                    'users.email',
+                    'organizations.id as organization_id',
+                    'organizations.name as organization_name',
+                    'organizations.sector',
+                    'organizations.established_at',
+                    'organizations.email as organization_email',
+                    'organizations.phone as organization_phone',
+                    'organizations.address',
+                    'organizations.license_number',
+                    'organizations.executive_name',
+                    'organizations.shield_percentage',
+                    'organizations.shield_rank',
+                    'organizations.certificate_final_score',
+                    'organizations.certificate_final_rank'
+                )
+                ->first();
+
+            // Format output
+            $response = [
+                'success' => true,
+                'token' => request()->bearerToken(),
+                'user' => [
+                    'id' => $data->id,
+                    'name' => $data->name,
+                    'email' => $data->email,
+                    'organization' => $data->organization_id ? [
+                        'id' => $data->organization_id,
+                        'name' => $data->organization_name,
+                        'sector' => $data->sector,
+                        'established_at' => $data->established_at,
+                        'email' => $data->organization_email,
+                        'phone' => $data->organization_phone,
+                        'address' => $data->address,
+                        'license_number' => $data->license_number,
+                        'executive_name' => $data->executive_name,
+                        'shield_percentage' => $data->shield_percentage,
+                        'shield_rank' => $data->shield_rank,
+                        'certificate_final_score' => $data->certificate_final_score,
+                        'certificate_final_rank' => $data->certificate_final_rank,
+                    ] : null,
+                ]
+            ];
+
+            return response()->json($response, 200);
+
+        } catch (Exception $e) {
+            Log::error('Failed to fetch current user', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to fetch user data',
+                'error' => config('app.debug') ? $e->getMessage() : 'Unexpected error occurred'
             ], 500);
         }
     }

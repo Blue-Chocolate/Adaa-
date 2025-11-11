@@ -67,4 +67,8 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    public function organization()
+{
+    return $this->hasOne(\App\Models\Organization::class);
+}
 }
