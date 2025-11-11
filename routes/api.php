@@ -1,9 +1,7 @@
 <?php 
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuthController;
-// use App\Http\Controllers\Api\Auth\EmailVerificationController;
-use App\Http\Controllers\Api\EmailVerificationController;
+
 use App\Http\Controllers\Api\OrganizationController\OrganizationController;
 use App\Http\Controllers\Api\PodcastController\PodcastController;
 use App\Http\Controllers\Api\ReleaseController\ReleaseController;
@@ -17,16 +15,24 @@ use App\Http\Controllers\Api\Shield\ShieldSaveController;
 use App\Http\Controllers\Api\Shield\ShieldSubmissionController;
 use App\Http\Controllers\Api\Shield\ShieldAttachmentController;
 use App\Http\Controllers\Api\Shield\ShieldDownloadController;
-
+use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\Auth\EmailVerificationController;
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
 |--------------------------------------------------------------------------
 */
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login'])->name('login');
-Route::get('/email/verify', [AuthController::class, 'verifyEmail']);
-Route::post('/email/resend', [AuthController::class, 'resendVerification']);
+Route::post('/login', [AuthController::class, 'login']);
+
+// Email verification routes
+// Email verification routes - No authentication required
+Route::get('/email/verify', [EmailVerificationController::class, 'verify'])
+    ->name('verification.verify');
+Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
+    ->name('verification.resend');
+
+
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
 
