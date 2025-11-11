@@ -43,6 +43,7 @@ Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
 
         
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+Route::middleware('auth:sanctum')->get('/auth/me', [AuthController::class, 'me']);
 
 
 /*
