@@ -4,13 +4,16 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Mail\VerificationEmail;
+use App\Mail\PasswordResetEmail;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Exception;
 
+// FIXED EmailVerificationService
 class EmailVerificationService
 {
     /**
@@ -23,13 +26,12 @@ class EmailVerificationService
             $token = Str::random(64);
             
             // Update user with token and timestamp
-            $user->update([
-                'email_verification_token' => $token,
-                'email_verification_sent_at' => now()
-            ]);
+            $user->email_verification_token = $token;
+            $user->email_verification_sent_at = now();
+            $user->save();
 
             // Generate verification URL
-            $verificationUrl = url("/api/email/verify?token={$token}");
+            $verificationUrl = url("/api/auth/email/verify?token={$token}");
 
             // Send email
             Mail::to($user->email)->send(new VerificationEmail($user, $verificationUrl));
@@ -58,6 +60,7 @@ class EmailVerificationService
             $user = User::where('email_verification_token', $token)->first();
 
             if (!$user) {
+                Log::warning('Invalid verification token attempted', ['token' => substr($token, 0, 10)]);
                 return [
                     'success' => false,
                     'message' => 'Invalid verification token'
@@ -84,16 +87,30 @@ class EmailVerificationService
                 }
             }
 
-            // Verify the email
-            $user->update([
-                'email_verified_at' => now(),
-                'email_verification_token' => null,
-                'email_verification_sent_at' => null
-            ]);
+            // Verify the email - FIXED: Using direct assignment and save()
+            $user->email_verified_at = now();
+            $user->email_verification_token = null;
+            $user->email_verification_sent_at = null;
+            $saved = $user->save();
+
+            if (!$saved) {
+                Log::error('Failed to save email verification', [
+                    'user_id' => $user->id,
+                    'email' => $user->email
+                ]);
+                return [
+                    'success' => false,
+                    'message' => 'Failed to verify email. Please try again.'
+                ];
+            }
+
+            // Refresh the user to get the updated values
+            $user->refresh();
 
             Log::info('Email verified successfully', [
                 'user_id' => $user->id,
-                'email' => $user->email
+                'email' => $user->email,
+                'verified_at' => $user->email_verified_at
             ]);
 
             return [
@@ -179,3 +196,6 @@ class EmailVerificationService
         }
     }
 }
+
+// PasswordResetService
+

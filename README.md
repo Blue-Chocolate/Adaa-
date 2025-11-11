@@ -615,7 +615,7 @@ Content-Type: application/json
 
 Creates a new user account and sends email verification.
 
-**Endpoint:** `POST /api/auth/register`
+**Endpoint:** `POST /api/register`
 
 **Request Body:**
 ```json
