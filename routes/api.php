@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\Shield\ShieldAttachmentController;
 use App\Http\Controllers\Api\Shield\ShieldDownloadController;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\EmailVerificationController;
+use App\Http\Controllers\Api\Auth\PasswordResetController;
+
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
@@ -32,7 +34,14 @@ Route::get('/email/verify', [EmailVerificationController::class, 'verify'])
 Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
     ->name('verification.resend');
 
+    Route::post('/password/forgot', [PasswordResetController::class, 'forgotPassword'])
+        ->name('password.forgot');
+    Route::post('/password/reset', [PasswordResetController::class, 'resetPassword'])
+        ->name('password.reset');
+    Route::get('/password/verify-token', [PasswordResetController::class, 'verifyToken'])
+        ->name('password.verify-token');
 
+        
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
 

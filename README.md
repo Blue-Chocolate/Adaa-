@@ -609,41 +609,404 @@ Content-Type: application/json
 
 ---
 
-## Authentication
+## Authentication Endpoints
 
-All protected endpoints require authentication using Laravel Sanctum. Include the authentication token in request headers.
+### 1. Register User
 
+Creates a new user account and sends email verification.
+
+**Endpoint:** `POST /api/auth/register`
+
+**Request Body:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+1234567890",
+  "password": "SecurePass123!",
+  "password_confirmation": "SecurePass123!"
+}
+```
+
+**Validation Rules:**
+- `name`: required, string, max 255 characters
+- `email`: required, valid email, max 255 characters, unique
+- `phone`: optional, string, max 20 characters, unique
+- `password`: required, min 8 characters, must match confirmation
+- `password_confirmation`: required
+
+**Success Response (201):**
+```json
+{
+  "success": true,
+  "message": "User registered successfully. Please verify your email within 10 minutes.",
+  "user": {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+1234567890",
+    "email_verified_at": null
+  }
+}
+```
+
+**Error Responses:**
+
+*Validation Error (422):*
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": {
+    "email": ["The email has already been taken."],
+    "password": ["The password must be at least 8 characters."]
+  },
+  "error_type": "validation_error"
+}
+```
+
+*Server Error (500):*
+```json
+{
+  "success": false,
+  "message": "Registration failed",
+  "error": "Error details (only in debug mode)",
+  "error_type": "server_error"
+}
+```
+
+---
+
+### 2. Login
+
+Authenticates user and returns access token.
+
+**Endpoint:** `POST /api/auth/login`
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+**Validation Rules:**
+- `email`: required, valid email
+- `password`: required, string
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "1|laravel_sanctum_abc123xyz...",
+  "user": {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+1234567890",
+    "email_verified_at": "2024-01-15T10:30:00.000000Z"
+  }
+}
+```
+
+**Error Responses:**
+
+*Invalid Credentials (401):*
+```json
+{
+  "success": false,
+  "message": "Invalid credentials"
+}
+```
+
+*Email Not Verified (401):*
+```json
+{
+  "success": false,
+  "message": "Please verify your email before logging in"
+}
+```
+
+**Usage:**
+Store the token and include it in subsequent requests:
+```
+Authorization: Bearer 1|laravel_sanctum_abc123xyz...
+```
+
+---
+
+### 3. Logout
+
+Revokes all user tokens.
+
+**Endpoint:** `POST /api/auth/logout`
+
+**Headers:**
 ```
 Authorization: Bearer {token}
 ```
 
-### Register
-**Endpoint:** `POST /api/register`
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
+```
+
+**Error Response (401):**
+```json
+{
+  "success": false,
+  "message": "Unauthenticated",
+  "error_type": "authentication_error"
+}
+```
+
+---
+
+## Email Verification Endpoints
+
+### 4. Verify Email
+
+Verifies user's email address using the token from the email.
+
+**Endpoint:** `GET /api/auth/email/verify?token={token}`
+
+**Query Parameters:**
+- `token` (required): 64-character verification token
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Email verified successfully! You can now login.",
+  "user": {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "email_verified_at": "2024-01-15T10:30:00.000000Z"
+  }
+}
+```
+
+**Error Responses:**
+
+*Invalid Token (400):*
+```json
+{
+  "success": false,
+  "message": "Invalid verification token"
+}
+```
+
+*Already Verified (400):*
+```json
+{
+  "success": false,
+  "message": "Email already verified"
+}
+```
+
+*Token Expired (400):*
+```json
+{
+  "success": false,
+  "message": "Verification token has expired. Please request a new one."
+}
+```
+
+*Missing Token (422):*
+```json
+{
+  "success": false,
+  "message": "Verification token is required"
+}
+```
+
+---
+
+### 5. Resend Verification Email
+
+Sends a new verification email to the user.
+
+**Endpoint:** `POST /api/auth/email/resend`
 
 **Request Body:**
 ```json
 {
-  "name": "Hassan Ali",
-  "email": "hassan@example.com",
-  "phone": "01000000001",
-  "password": "password123",
-  "password_confirmation": "password123",
-  "role": "admin",
-  "bio": "Admin user for the platform",
-  "avatar": null
+  "email": "john@example.com"
 }
 ```
 
-### Login
-**Endpoint:** `POST /api/login`
+**Validation Rules:**
+- `email`: required, valid email, must exist in users table
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Verification email sent successfully. Please check your inbox."
+}
+```
+
+**Error Responses:**
+
+*User Not Found (400):*
+```json
+{
+  "success": false,
+  "message": "User not found"
+}
+```
+
+*Already Verified (400):*
+```json
+{
+  "success": false,
+  "message": "Email is already verified"
+}
+```
+
+*Rate Limited (400):*
+```json
+{
+  "success": false,
+  "message": "Please wait before requesting another verification email"
+}
+```
+
+**Note:** Rate limit is 2 minutes between requests.
+
+---
+
+## Password Reset Endpoints
+
+### 6. Forgot Password
+
+Sends a password reset link to the user's email.
+
+**Endpoint:** `POST /api/auth/password/forgot`
 
 **Request Body:**
 ```json
 {
-  "email": "hassan@example.com",
-  "password": "password123"
+  "email": "john@example.com"
 }
 ```
+
+**Validation Rules:**
+- `email`: required, valid email
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "If your email exists in our system, you will receive a password reset link shortly."
+}
+```
+
+**Note:** For security, the response is the same whether the email exists or not.
+
+**Error Responses:**
+
+*Rate Limited (400):*
+```json
+{
+  "success": false,
+  "message": "Please wait before requesting another password reset email"
+}
+```
+
+*Server Error (500):*
+```json
+{
+  "success": false,
+  "message": "Failed to send password reset email"
+}
+```
+
+**Rate Limit:** 2 minutes between requests per email.
+
+---
+
+### 7. Reset Password
+
+Resets the user's password using the token from the email.
+
+**Endpoint:** `POST /api/auth/password/reset`
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com",
+  "token": "abc123xyz...64-character-token",
+  "password": "NewSecurePass123!",
+  "password_confirmation": "NewSecurePass123!"
+}
+```
+
+**Validation Rules:**
+- `email`: required, valid email
+- `token`: required, string, 64 characters
+- `password`: required, min 8 characters, must match confirmation
+- `password_confirmation`: required
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Password has been reset successfully. Please login with your new password."
+}
+```
+
+**Error Responses:**
+
+*Invalid Token/Email (400):*
+```json
+{
+  "success": false,
+  "message": "Invalid reset token or email"
+}
+```
+
+*Token Expired (400):*
+```json
+{
+  "success": false,
+  "message": "Password reset token has expired. Please request a new one."
+}
+```
+
+*Validation Error (422):*
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": {
+    "password": ["The password must be at least 8 characters."]
+  },
+  "error_type": "validation_error"
+}
+```
+
+**Note:** After successful password reset, all existing user tokens are revoked.
+
+---
+
+### 8. Verify Reset Token (Optional)
+
+Verifies if a password reset token is valid before showing the reset form.
+
+**Endpoint:** `GET /api/auth/password/verify-token?email={email}&token={token}`
+
+**Query Parameters:**
+- `email` (required): User's email address
+- `token` (required): Password reset token
+
+
 
 **Response:**
 ```json
