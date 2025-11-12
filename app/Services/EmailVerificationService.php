@@ -31,7 +31,7 @@ class EmailVerificationService
             $user->save();
 
             // Generate verification URL
-            $verificationUrl = url("/api/auth/email/verify?token={$token}");
+            $verificationUrl = url("/api/email/verify?token={$token}");
 
             // Send email
             Mail::to($user->email)->send(new VerificationEmail($user, $verificationUrl));
@@ -77,7 +77,7 @@ class EmailVerificationService
 
             // Check token expiration (10 minutes)
             if ($user->email_verification_sent_at) {
-                $expiresAt = Carbon::parse($user->email_verification_sent_at)->addMinutes(10);
+                $expiresAt = Carbon::parse($user->email_verification_sent_at)->addMinutes(1);
                 
                 if (now()->greaterThan($expiresAt)) {
                     return [

@@ -165,15 +165,16 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Single query to join users + organizations
+            // Perform LEFT JOIN to get user's organization if it exists
             $data = DB::table('users')
                 ->leftJoin('organizations', 'users.id', '=', 'organizations.user_id')
                 ->where('users.id', $user->id)
                 ->select(
                     'users.id',
-                    'users.first_name',
-                    'users.last_name',
+                    'users.name',
                     'users.email',
+                    'users.phone',
+                    'users.user_priviliages',
                     'organizations.id as organization_id',
                     'organizations.name as organization_name',
                     'organizations.sector',
@@ -190,7 +191,7 @@ class AuthController extends Controller
                 )
                 ->first();
 
-            // Format output
+            // Build clean JSON response
             $response = [
                 'success' => true,
                 'token' => request()->bearerToken(),
@@ -198,6 +199,8 @@ class AuthController extends Controller
                     'id' => $data->id,
                     'name' => $data->name,
                     'email' => $data->email,
+                    'phone' => $data->phone,
+                    'user_priviliages' => $data->user_priviliages,
                     'organization' => $data->organization_id ? [
                         'id' => $data->organization_id,
                         'name' => $data->organization_name,
