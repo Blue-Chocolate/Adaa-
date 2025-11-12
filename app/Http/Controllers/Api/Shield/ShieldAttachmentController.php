@@ -18,7 +18,7 @@ class ShieldAttachmentController extends Controller
         $user = Auth::user();
         
         // Get user's organization
-        $organization = $user->organizations()->first();
+        $organization = $user->organization->first();
         
         if (!$organization) {
             return response()->json([

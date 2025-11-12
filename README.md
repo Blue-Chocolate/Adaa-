@@ -681,7 +681,7 @@ Creates a new user account and sends email verification.
 
 Authenticates user and returns access token.
 
-**Endpoint:** `POST /api/auth/login`
+**Endpoint:** `POST /api/login`
 
 **Request Body:**
 ```json
@@ -741,7 +741,7 @@ Authorization: Bearer 1|laravel_sanctum_abc123xyz...
 
 Revokes all user tokens.
 
-**Endpoint:** `POST /api/auth/logout`
+**Endpoint:** `POST /api/logout`
 
 **Headers:**
 ```
@@ -773,7 +773,7 @@ Authorization: Bearer {token}
 
 Verifies user's email address using the token from the email.
 
-**Endpoint:** `GET /api/auth/email/verify?token={token}`
+**Endpoint:** `GET /api/email/verify?token={token}`
 
 **Query Parameters:**
 - `token` (required): 64-character verification token
@@ -832,7 +832,7 @@ Verifies user's email address using the token from the email.
 
 Sends a new verification email to the user.
 
-**Endpoint:** `POST /api/auth/email/resend`
+**Endpoint:** `POST /api/email/resend`
 
 **Request Body:**
 ```json
@@ -888,7 +888,7 @@ Sends a new verification email to the user.
 
 Sends a password reset link to the user's email.
 
-**Endpoint:** `POST /api/auth/password/forgot`
+**Endpoint:** `POST /api/password/forgot`
 
 **Request Body:**
 ```json
@@ -936,7 +936,7 @@ Sends a password reset link to the user's email.
 
 Resets the user's password using the token from the email.
 
-**Endpoint:** `POST /api/auth/password/reset`
+**Endpoint:** `POST /api/password/reset`
 
 **Request Body:**
 ```json
@@ -1000,7 +1000,7 @@ Resets the user's password using the token from the email.
 
 Verifies if a password reset token is valid before showing the reset form.
 
-**Endpoint:** `GET /api/auth/password/verify-token?email={email}&token={token}`
+**Endpoint:** `GET /api/password/verify-token?email={email}&token={token}`
 
 **Query Parameters:**
 - `email` (required): User's email address

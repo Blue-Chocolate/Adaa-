@@ -7,6 +7,7 @@ use App\Http\Requests\ResendVerificationRequest;
 use App\Services\EmailVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
@@ -23,7 +24,7 @@ class EmailVerificationController extends Controller
      * Verify email with token
      * GET /api/email/verify?token=xxx
      */
-    public function verify(Request $request): JsonResponse
+    public function verify(Request $request): JsonResponse|RedirectResponse
     {
         try {
             $token = $request->query('token') ?? $request->input('token');
@@ -43,6 +44,13 @@ class EmailVerificationController extends Controller
             }
 
             $result = $this->verificationService->verifyEmail($token);
+
+            // If verification succeeded, redirect to the verified page
+            if ($result['success'] && isset($result['redirect_url'])) {
+                return redirect($result['redirect_url'])
+                    ->with('message', $result['message'])
+                    ->with('user', $result['user'] ?? null);
+            }
 
             return response()->json($result, $result['success'] ? 200 : 400);
 
