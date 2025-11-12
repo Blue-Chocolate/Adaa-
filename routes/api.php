@@ -19,31 +19,40 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 
+use App\Http\Controllers\DumpAuthenticationController;
+
+Route::post('/register', [DumpAuthenticationController::class, 'register']);
+Route::post('/login', [DumpAuthenticationController::class, 'login']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [DumpAuthenticationController::class, 'logout']);
+    Route::get('/me', [DumpAuthenticationController::class, 'me']);
+});
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
 |--------------------------------------------------------------------------
 */
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// Route::post('/register', [AuthController::class, 'register']);
+// Route::post('/login', [AuthController::class, 'login']);
 
-// Email verification routes
-// Email verification routes - No authentication required
-Route::get('/email/verify', [EmailVerificationController::class, 'verify'])
-    ->name('verification.verify');
-Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
-    ->name('verification.resend');
+// // Email verification routes
+// // Email verification routes - No authentication required
+// Route::get('/email/verify', [EmailVerificationController::class, 'verify'])
+//     ->name('verification.verify');
+// Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
+//     ->name('verification.resend');
 
-    Route::post('/password/forgot', [PasswordResetController::class, 'forgotPassword'])
-        ->name('password.forgot');
-    Route::post('/password/reset', [PasswordResetController::class, 'resetPassword'])
-        ->name('password.reset');
-    Route::get('/password/verify-token', [PasswordResetController::class, 'verifyToken'])
-        ->name('password.verify-token');
+//     Route::post('/password/forgot', [PasswordResetController::class, 'forgotPassword'])
+//         ->name('password.forgot');
+//     Route::post('/password/reset', [PasswordResetController::class, 'resetPassword'])
+//         ->name('password.reset');
+//     Route::get('/password/verify-token', [PasswordResetController::class, 'verifyToken'])
+//         ->name('password.verify-token');
 
         
-Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
+// Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+// Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
 
 
 /*
