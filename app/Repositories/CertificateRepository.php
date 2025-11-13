@@ -1,7 +1,5 @@
 <?php
 
-// app/Repositories/CertificateRepository.php
-
 namespace App\Repositories;
 
 use App\Models\{Organization, CertificateAxis, CertificateQuestion, CertificateAnswer};
@@ -34,6 +32,11 @@ class CertificateRepository
             foreach ($answersData as $answerInput) {
                 $question = CertificateQuestion::findOrFail($answerInput['question_id']);
                 
+                // 🔍 Verify question belongs to the specified path
+                if ($question->path !== $path) {
+                    throw new \Exception("Question {$question->id} does not belong to path '{$path}'");
+                }
+                
                 // 🧹 Normalize selected option
                 $selectedOption = trim($answerInput['selected_option'], '"\'');
                 $selectedOption = trim($selectedOption);
@@ -56,7 +59,10 @@ class CertificateRepository
                 $attachmentPath = null;
                 if (!empty($answerInput['attachment'])) {
                     $file = $answerInput['attachment'];
-                    $attachmentPath = $file->store("certificate_attachments/{$path}/{$organizationId}", 'public');
+                    $attachmentPath = $file->store(
+                        "certificate_attachments/{$path}/{$organizationId}", 
+                        'public'
+                    );
                 }
 
                 // 💾 Store answer
@@ -72,42 +78,66 @@ class CertificateRepository
                 $totalScore += $finalPoints;
             }
 
-            // 🏆 Calculate rank
+            // 🏆 Calculate rank for this path
             $rank = $this->calculateRank($totalScore, $path);
             
-            // 📝 Update organization
-            $organization = Organization::findOrFail($organizationId);
-            $organization->update([
-                'certificate_final_score' => $totalScore,
-                'certificate_final_rank' => $rank,
-            ]);
+            // 📝 Update organization's overall scores
+            $this->updateOrganizationScores($organizationId);
 
             return [
-                'final_score' => $totalScore,
-                'final_rank' => $rank,
+                'score' => $totalScore,
+                'rank' => $rank,
+                'max_possible_score' => $this->getMaxScore($path),
             ];
         });
     }
 
     /**
-     * 🔄 Update existing answers
+     * 🔄 Update existing answers for a specific path
      */
     public function updateAnswersWithAttachments(int $organizationId, array $data, string $path): array
     {
         return DB::transaction(function () use ($organizationId, $data, $path) {
-            // 🗑️ Delete old answers and files
-            $organization = Organization::with('certificateAnswers')->findOrFail($organizationId);
-            
-            foreach ($organization->certificateAnswers as $answer) {
+            // 🗑️ Delete old answers and files for this path only
+            $this->deleteCertificateAnswersByPath(
+                Organization::findOrFail($organizationId), 
+                $path
+            );
+
+            // 💾 Save new answers
+            return $this->saveAnswersWithAttachments($organizationId, $data, $path);
+        });
+    }
+
+    /**
+     * 🗑️ Delete certificate answers for a specific path
+     */
+    public function deleteCertificateAnswersByPath(Organization $organization, string $path): void
+    {
+        DB::transaction(function () use ($organization, $path) {
+            // Get answers for this path only
+            $answers = $organization->certificateAnswers()
+                ->whereHas('question', function($query) use ($path) {
+                    $query->where('path', $path);
+                })
+                ->get();
+
+            // Delete files
+            foreach ($answers as $answer) {
                 if ($answer->attachment_path && Storage::disk('public')->exists($answer->attachment_path)) {
                     Storage::disk('public')->delete($answer->attachment_path);
                 }
             }
-            
-            CertificateAnswer::where('organization_id', $organizationId)->delete();
 
-            // 💾 Save new answers
-            return $this->saveAnswersWithAttachments($organizationId, $data, $path);
+            // Delete answer records
+            CertificateAnswer::where('organization_id', $organization->id)
+                ->whereHas('question', function($query) use ($path) {
+                    $query->where('path', $path);
+                })
+                ->delete();
+
+            // Recalculate overall scores
+            $this->updateOrganizationScores($organization->id);
         });
     }
 
@@ -130,6 +160,40 @@ class CertificateRepository
                 'certificate_final_rank' => null,
             ]);
         });
+    }
+
+    /**
+     * 📊 Update organization's overall certificate scores
+     */
+    private function updateOrganizationScores(int $organizationId): void
+    {
+        $organization = Organization::with('certificateAnswers')->findOrFail($organizationId);
+        
+        $totalScore = $organization->certificateAnswers->sum('final_points');
+        
+        // Calculate overall rank based on combined scores from all paths
+        $allPaths = ['strategic', 'operational', 'hr'];
+        $combinedMaxScore = collect($allPaths)->sum(fn($path) => $this->getMaxScore($path));
+        
+        $overallRank = null;
+        if ($totalScore > 0) {
+            $normalizedScore = ($combinedMaxScore > 0) 
+                ? ($totalScore / $combinedMaxScore) * 100 
+                : 0;
+            
+            $overallRank = match (true) {
+                $normalizedScore >= 86 => 'diamond',
+                $normalizedScore >= 76 => 'gold',
+                $normalizedScore >= 66 => 'silver',
+                $normalizedScore >= 55 => 'bronze',
+                default => 'bronze',
+            };
+        }
+
+        $organization->update([
+            'certificate_final_score' => $totalScore,
+            'certificate_final_rank' => $overallRank,
+        ]);
     }
 
     /**
@@ -160,9 +224,9 @@ class CertificateRepository
     }
 
     /**
-     * 🏆 Calculate rank based on score and path
+     * 🏆 Calculate rank based on score and path (public for controller use)
      */
-    private function calculateRank(float $score, string $path): string
+    public function calculateRank(float $score, string $path): string
     {
         $maxScore = $this->getMaxScore($path);
         $normalizedScore = ($maxScore > 0) ? ($score / $maxScore) * 100 : 0;
@@ -177,9 +241,9 @@ class CertificateRepository
     }
 
     /**
-     * 📈 Get maximum possible score for path
+     * 📈 Get maximum possible score for path (public for controller use)
      */
-    private function getMaxScore(string $path): float
+    public function getMaxScore(string $path): float
     {
         return CertificateQuestion::where('path', $path)
             ->get()

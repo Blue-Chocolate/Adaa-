@@ -1,7 +1,6 @@
 <?php
 
-
-namespace App\Http\Controllers\Api\CertificateController;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\CertificateRepository;
@@ -13,18 +12,21 @@ class CertificateController extends Controller
 {
     protected CertificateRepository $repo;
 
+    // 🎯 Allowed paths configuration
+    private const ALLOWED_PATHS = ['strategic', 'operational', 'hr'];
+
     public function __construct(CertificateRepository $repo)
     {
         $this->repo = $repo;
     }
 
     /**
-     * ➊ Get questions by path (Strategic only for now)
+     * ➊ Get questions by path
      */
     public function getQuestionsByPath(string $path)
     {
-        if (!in_array($path, ['strategic', 'operational', 'hr'])) {
-            return response()->json(['error' => 'Invalid path'], 400);
+        if (!$this->isValidPath($path)) {
+            return response()->json(['error' => 'Invalid path. Allowed: strategic, operational, hr'], 400);
         }
 
         $axes = $this->repo->getQuestionsByPath($path);
@@ -36,15 +38,15 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➋ Submit answers for an organization
+     * ➋ Submit answers for an organization (specific path)
      */
-    public function submitAnswers(Request $request, int $organizationId)
+    public function submitAnswers(Request $request, int $organizationId, string $path)
     {
-        // 🔍 Verify organization exists
+        if (!$this->isValidPath($path)) {
+            return response()->json(['error' => 'Invalid path'], 400);
+        }
+
         $organization = Organization::findOrFail($organizationId);
-        
-        // 🎯 Determine path (for now, strategic only)
-        $path = 'strategic';
         
         // ✅ Validate request
         $validator = $this->buildValidator($request);
@@ -58,14 +60,20 @@ class CertificateController extends Controller
 
         // 💾 Process answers
         try {
-            $result = $this->repo->saveAnswersWithAttachments($organizationId, $request->all(), $path);
+            $result = $this->repo->saveAnswersWithAttachments(
+                $organizationId, 
+                $request->all(), 
+                $path
+            );
 
             return response()->json([
                 'success' => true,
                 'message' => 'تم إرسال الإجابات والملفات بنجاح ✅',
                 'data' => [
-                    'final_score' => $result['final_score'],
-                    'final_rank' => $result['final_rank'],
+                    'path' => $path,
+                    'score' => $result['score'],
+                    'rank' => $result['rank'],
+                    'max_possible_score' => $result['max_possible_score'],
                 ]
             ]);
         } catch (\Exception $e) {
@@ -77,7 +85,7 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➌ Show certificate details with all answers
+     * ➌ Get certificate summary for organization (all paths)
      */
     public function show(int $organizationId)
     {
@@ -88,24 +96,81 @@ class CertificateController extends Controller
             }
         ])->findOrFail($organizationId);
 
+        // 📊 Group answers by path
+        $answersByPath = $organization->certificateAnswers->groupBy(function($answer) {
+            return $answer->question->path;
+        });
+
+        $pathSummaries = [];
+        foreach (self::ALLOWED_PATHS as $path) {
+            $pathAnswers = $answersByPath->get($path, collect());
+            
+            $pathSummaries[$path] = [
+                'completed' => $pathAnswers->isNotEmpty(),
+                'score' => $pathAnswers->sum('final_points'),
+                'rank' => $this->repo->calculateRank(
+                    $pathAnswers->sum('final_points'), 
+                    $path
+                ),
+                'answers_count' => $pathAnswers->count(),
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
                 'organization' => $organization,
-                'certificate_score' => $organization->certificate_final_score,
-                'certificate_rank' => $organization->certificate_final_rank,
+                'overall_summary' => [
+                    'total_score' => $organization->certificate_final_score,
+                    'overall_rank' => $organization->certificate_final_rank,
+                ],
+                'path_summaries' => $pathSummaries,
                 'answers' => $organization->certificateAnswers,
             ]
         ]);
     }
 
     /**
-     * ➍ Update answers (for corrections/edits)
+     * ➍ Get detailed results for a specific path
      */
-    public function updateAnswers(Request $request, int $organizationId)
+    public function showPathResults(int $organizationId, string $path)
     {
+        if (!$this->isValidPath($path)) {
+            return response()->json(['error' => 'Invalid path'], 400);
+        }
+
+        $organization = Organization::with([
+            'certificateAnswers' => function($query) use ($path) {
+                $query->whereHas('question', function($q) use ($path) {
+                    $q->where('path', $path);
+                })->with('question.axis');
+            }
+        ])->findOrFail($organizationId);
+
+        $pathAnswers = $organization->certificateAnswers;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'path' => $path,
+                'score' => $pathAnswers->sum('final_points'),
+                'rank' => $this->repo->calculateRank($pathAnswers->sum('final_points'), $path),
+                'max_possible_score' => $this->repo->getMaxScore($path),
+                'answers' => $pathAnswers,
+            ]
+        ]);
+    }
+
+    /**
+     * ➎ Update answers for a specific path
+     */
+    public function updateAnswers(Request $request, int $organizationId, string $path)
+    {
+        if (!$this->isValidPath($path)) {
+            return response()->json(['error' => 'Invalid path'], 400);
+        }
+
         $organization = Organization::findOrFail($organizationId);
-        $path = 'strategic';
         
         $validator = $this->buildValidator($request);
         
@@ -117,14 +182,19 @@ class CertificateController extends Controller
         }
 
         try {
-            $result = $this->repo->updateAnswersWithAttachments($organizationId, $request->all(), $path);
+            $result = $this->repo->updateAnswersWithAttachments(
+                $organizationId, 
+                $request->all(), 
+                $path
+            );
 
             return response()->json([
                 'success' => true,
                 'message' => 'تم تحديث الإجابات بنجاح ✅',
                 'data' => [
-                    'final_score' => $result['final_score'],
-                    'final_rank' => $result['final_rank'],
+                    'path' => $path,
+                    'score' => $result['score'],
+                    'rank' => $result['rank'],
                 ]
             ]);
         } catch (\Exception $e) {
@@ -136,7 +206,33 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➎ Delete certificate answers with all files
+     * ➏ Delete answers for a specific path
+     */
+    public function destroyPath(int $organizationId, string $path)
+    {
+        if (!$this->isValidPath($path)) {
+            return response()->json(['error' => 'Invalid path'], 400);
+        }
+
+        $organization = Organization::findOrFail($organizationId);
+        
+        try {
+            $this->repo->deleteCertificateAnswersByPath($organization, $path);
+
+            return response()->json([
+                'success' => true,
+                'message' => "تم حذف إجابات المسار {$path} بنجاح ✅"
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * ➐ Delete all certificate data for organization
      */
     public function destroy(int $organizationId)
     {
@@ -147,7 +243,7 @@ class CertificateController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم الحذف بنجاح ✅'
+                'message' => 'تم حذف جميع البيانات بنجاح ✅'
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -168,5 +264,13 @@ class CertificateController extends Controller
             'answers.*.selected_option' => 'required|string',
             'answers.*.attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
         ]);
+    }
+
+    /**
+     * ✅ Validate path
+     */
+    private function isValidPath(string $path): bool
+    {
+        return in_array($path, self::ALLOWED_PATHS);
     }
 }
