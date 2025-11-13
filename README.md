@@ -8,6 +8,7 @@
 - [Podcasts](#podcasts)
 - [Releases](#releases)
 - [Blogs](#blogs)
+- [Models](#models)
 
 ---
 
@@ -1754,121 +1755,12 @@ Rank = Silver (70% ≤ score < 90%)
   "success": false,
   "message": "Failed to submit answers: Database connection error"
 }
-```
+**Blogs** 
+GET api/models 
 
----
+/     //FRO ALL models 
+/id for models by ID 
 
-## Frontend Integration Tips
-
-### Axios Example (React/Vue)
-
-```javascript
-// Setup axios instance
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: 'http://your-domain.com/api',
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-});
-
-// Add token to requests
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Login
-async function login(email, password) {
-  const response = await api.post('/login', { email, password });
-  localStorage.setItem('token', response.data.token);
-  return response.data;
-}
-
-// Get questions
-async function getQuestions() {
-  const response = await api.get('/shield/questions');
-  return response.data.axes;
-}
-
-// Save draft
-async function saveDraft(answers) {
-  const response = await api.post('/shield/save', { answers });
-  return response.data;
-}
-
-// Submit final
-async function submitAnswers(answers) {
-  const response = await api.post('/shield/submit', { answers });
-  return response.data;
-}
-
-// Upload file
-async function uploadFile(file) {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  const response = await api.post('/shield/attachment/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
-  
-  return response.data.file_url;
-}
-```
-
-### Fetch API Example (Vanilla JS)
-
-```javascript
-const BASE_URL = 'http://your-domain.com/api';
-let authToken = null;
-
-// Login
-async function login(email, password) {
-  const response = await fetch(`${BASE_URL}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  });
-  
-  const data = await response.json();
-  authToken = data.token;
-  localStorage.setItem('token', authToken);
-  return data;
-}
-
-// Get questions
-async function getQuestions() {
-  const response = await fetch(`${BASE_URL}/shield/questions`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'Content-Type': 'application/json'
-    }
-  });
-  
-  return await response.json();
-}
-
-// Submit answers
-async function submitAnswers(answers) {
-  const response = await fetch(`${BASE_URL}/shield/submit`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ answers })
-  });
-  
-  return await response.json();
-}
-```
-
----
 
 ## Testing Checklist
 
