@@ -157,3 +157,7 @@ Route::prefix('certificates')->group(function () {
         ->name('certificates.destroy');
     
 });
+use App\Http\Controllers\Api\ModelController\ModelController;
+
+Route::get('/models', [ModelController::class, 'index']);
+Route::get('/models/{id}', [ModelController::class, 'show']);
