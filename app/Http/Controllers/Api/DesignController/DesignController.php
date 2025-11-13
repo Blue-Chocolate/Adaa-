@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Repositories\DesignRepository;
+use App\Repositories\DesginRepository;
 use Illuminate\Http\Request;
 
-class DesignController extends Controller
+class DesginController extends Controller
 {
-    protected DesignRepository $repo;
+    protected DesginRepository $repo;
 
-    public function __construct(DesignRepository $repo)
+    public function __construct(DesginRepository $repo)
     {
         $this->repo = $repo;
     }
@@ -20,19 +20,19 @@ class DesignController extends Controller
         $limit = (int) $request->query('limit', 10);
         $page = (int) $request->query('page', 1);
 
-        $designs = $this->repo->all($limit, $page);
+        $Desgins = $this->repo->all($limit, $page);
 
-        return response()->json($designs);
+        return response()->json($Desgins);
     }
 
     public function show(int $id)
     {
-        $design = $this->repo->find($id);
+        $Desgin = $this->repo->find($id);
 
-        if (!$design) {
-            return response()->json(['message' => 'Design not found'], 404);
+        if (!$Desgin) {
+            return response()->json(['message' => 'Desgin not found'], 404);
         }
 
-        return response()->json($design);
+        return response()->json($Desgin);
     }
 }
