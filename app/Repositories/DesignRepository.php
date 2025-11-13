@@ -2,34 +2,34 @@
 
 namespace App\Repositories;
 
-use App\Models\Design;
+use App\Models\Desgin;
 use Illuminate\Pagination\LengthAwarePaginator;
 
-class DesignRepository
+class DesginRepository
 {
     public function all(int $limit = 10, int $page = 1): LengthAwarePaginator
     {
-        return Design::query()->paginate($limit, ['*'], 'page', $page);
+        return Desgin::query()->paginate($limit, ['*'], 'page', $page);
     }
 
-    public function find(int $id): ?Design
+    public function find(int $id): ?Desgin
     {
-        return Design::find($id);
+        return Desgin::find($id);
     }
 
-    public function create(array $data): Design
+    public function create(array $data): Desgin
     {
-        return Design::create($data);
+        return Desgin::create($data);
     }
 
-    public function update(Design $design, array $data): Design
+    public function update(Desgin $Desgin, array $data): Desgin
     {
-        $design->update($data);
-        return $design;
+        $Desgin->update($data);
+        return $Desgin;
     }
 
-    public function delete(Design $design): bool
+    public function delete(Desgin $Desgin): bool
     {
-        return $design->delete();
+        return $Desgin->delete();
     }
 }

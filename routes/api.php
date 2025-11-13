@@ -164,7 +164,14 @@ use App\Http\Controllers\Api\ModelController\ModelController;
 Route::get('/models', [ModelController::class, 'index']);
 Route::get('/models/{id}', [ModelController::class, 'show']);
 
-use App\Http\Controllers\Api\DesignController;
+use App\Http\Controllers\Api\DesginController;
 
-Route::get('/designs', [DesignController::class, 'index']);
-Route::get('/designs/{id}', [DesignController::class, 'show']);
+Route::get('/Desgins', [DesginController::class, 'index']);
+Route::get('/Desgins/{id}', [DesginController::class, 'show']);
+
+use App\Http\Controllers\Api\NewsController\NewsController;
+
+Route::prefix('news')->group(function () {
+    Route::get('/', [NewsController::class, 'index']); // list news
+    Route::get('/{id}', [NewsController::class, 'show']); // show single news
+});
