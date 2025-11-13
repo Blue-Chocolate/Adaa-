@@ -134,3 +134,28 @@ Route::middleware('auth:sanctum')->prefix('shield')->group(function () {
 
 });
 
+use App\Http\Controllers\Api\CertificateController\CertificateController;
+
+Route::prefix('certificates')->group(function () {
+    
+    // Get questions by path
+    Route::get('questions/{path}', [CertificateController::class, 'getQuestionsByPath'])
+        ->name('certificates.questions');
+    
+    // Submit answers for organization
+    Route::post('organizations/{organizationId}/answers', [CertificateController::class, 'submitAnswers'])
+        ->name('certificates.submit');
+    
+    // Show certificate details
+    Route::get('organizations/{organizationId}', [CertificateController::class, 'show'])
+        ->name('certificates.show');
+    
+    // Update answers
+    Route::put('organizations/{organizationId}/answers', [CertificateController::class, 'updateAnswers'])
+        ->name('certificates.update');
+    
+    // Delete certificate answers
+    Route::delete('organizations/{organizationId}/answers', [CertificateController::class, 'destroy'])
+        ->name('certificates.destroy');
+    
+});

@@ -59,7 +59,11 @@ class Organization extends Model
 
         $this->save();
     }
-    public function user() {
-    return $this->belongsTo(\App\Models\User::class);
+
+
+public function certificateAnswers(): HasMany
+{
+    return $this->hasMany(CertificateAnswer::class);
 }
+
 }
