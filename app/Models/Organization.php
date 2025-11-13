@@ -59,4 +59,10 @@ class Organization extends Model
 
         $this->save();
     }
+    
+public function certificateAnswers(): HasMany
+{
+    return $this->hasMany(CertificateAnswer::class);
+}
+
 }
