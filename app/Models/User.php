@@ -2,15 +2,12 @@
 
 namespace App\Models;
 
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -29,7 +26,7 @@ class User extends Authenticatable implements FilamentUser
         'otp_expires_at',
         'email_verification_token',
         'email_verification_sent_at',
-        'email_verified_at', // IMPORTANT: Make sure this is fillable
+        'email_verified_at', 
     ];
 
     /**
@@ -74,9 +71,4 @@ class User extends Authenticatable implements FilamentUser
 {
     return $this->hasOne(\App\Models\Organization::class);
 }
-public function canAccessPanel(Panel $panel): bool
-    {
-        throw new \Exception('Not implemented');
-    }
-
 }
