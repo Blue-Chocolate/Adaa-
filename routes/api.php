@@ -177,10 +177,10 @@ Route::get('models/{id}/download', [ModelController::class, 'downloadAttachment'
 // For multiple attachments per model
 Route::get('models/{modelId}/attachments/{attachmentId}/download', [ModelController::class, 'downloadAttachmentById']);
 
-use App\Http\Controllers\Api\DesginController;
+use App\Http\Controllers\Api\DesginController\DesginController;
 
-Route::get('/dashbaords', [DesginController::class, 'index']);
-Route::get('/dashbaords/{id}', [DesginController::class, 'show']);
+Route::get('/dashboards', [DesginController::class, 'index']);
+Route::get('/dashboards/{id}', [DesginController::class, 'show']);
 
 use App\Http\Controllers\Api\NewsController\NewsController;
 
