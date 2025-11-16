@@ -71,4 +71,13 @@ class User extends Authenticatable
 {
     return $this->hasOne(\App\Models\Organization::class);
 }
+public function subscription()
+{
+    return $this->hasOne(\App\Models\Subscription::class);
+}
+
+public function isSubscribed()
+{
+    return $this->subscription && $this->subscription->isValid();
+}
 }

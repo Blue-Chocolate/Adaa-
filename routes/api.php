@@ -163,7 +163,8 @@ Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('certificat
     // Delete certificate answers for specific path
     Route::delete('answers/{path}', [CertificateController::class, 'destroy'])
         ->name('certificates.destroy');
-        
+    Route::get('download/{path}', [CertificateController::class, 'downloadCertificate'])
+        ->name('certificates.download');    
 });
 
 use App\Http\Controllers\Api\ModelController\ModelController;
@@ -182,3 +183,8 @@ Route::prefix('news')->group(function () {
     Route::get('/', [NewsController::class, 'index']); // list news
     Route::get('/{id}', [NewsController::class, 'show']); // show single news
 });
+
+
+use App\Http\Controllers\Api\SubscriptionController\SubscriptionController;
+Route::post('/subscribe/pro', [SubscriptionController::class, 'subscribeToPro'])
+    ->middleware('auth:sanctum');

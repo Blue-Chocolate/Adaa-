@@ -17,6 +17,7 @@ class Organization extends Model
         'established_at',
         'email',
         'phone',
+        'status',
         'address',
         'license_number',
         'executive_name',

@@ -576,6 +576,59 @@ Content-Type: application/json
   "password": "password123"
 }
 ```
+GET /api/me
+
+Content-Type: application/json
+
+**Response:**
+```json
+{
+ {
+    "user": {
+        "id": 2,
+        "name": "Hassan Mohamed",
+        "email": "hassan@example.com",
+        "phone": null,
+        "email_verified_at": null,
+        "user_priviliages": null,
+        "created_at": "2025-11-16T06:36:12.000000Z",
+        "updated_at": "2025-11-16T06:36:12.000000Z"
+    },
+    "organization": {
+        "id": 1,
+        "name": "TechCorp",
+        "sector": "IT",
+        "email": "info@techcorp.com",
+        "phone": "1234567890",
+        "address": "123 Main St",
+        "license_number": "LIC12345",
+        "executive_name": "John Doe",
+        "status": "pending",
+        "shield_percentage": null,
+        "shield_rank": null,
+        "certificate_final_score": null,
+        "certificate_final_rank": null,
+        "established_at": "2020-05-01T00:00:00.000000Z",
+        "created_at": "2025-11-16T06:37:25.000000Z",
+        "updated_at": "2025-11-16T06:37:25.000000Z"
+    },
+    "token": {
+        "name": "api_token",
+        "abilities": [
+            "*"
+        ],
+        "created_at": "2025-11-16T06:51:13.000000Z",
+        "last_used_at": "2025-11-16T06:57:24.000000Z"
+    },
+    "flags": {
+        "email_verified": false,
+        "has_organization": true,
+        "organization_status": "pending",
+        "can_access_features": false
+    }
+}
+  }
+
 
 **Response:**
 ```json

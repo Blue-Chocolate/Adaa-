@@ -15,7 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias(['verified.email' => \App\Http\Middleware\EnsureEmailIsVerified::class]);
         $middleware->alias([
         'organization.approved' => \App\Http\Middleware\CheckOrganizationApproved::class,
+        'subscribed' => \App\Http\Middleware\EnsureUserIsSubscribed::class,
     ]);
+    
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
