@@ -111,7 +111,10 @@ Route::prefix('shield')->group(function () {
 | Shield Routes - Protected (Authentication Required)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->prefix('shield')->group(function () {
+use App\Http\Controllers\Api\CertificateController\CertificateController;
+
+// Shield Routes - Requires approved organization
+Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('shield')->group(function () {
     
     // Questions - Get all questions with user's saved answers
     Route::get('/questions', [ShieldQuestionsController::class, 'index']);
@@ -132,9 +135,8 @@ Route::middleware('auth:sanctum')->prefix('shield')->group(function () {
 
 });
 
-use App\Http\Controllers\Api\CertificateController\CertificateController;
-
-Route::middleware('auth:sanctum')->prefix('certificates')->group(function () {
+// Certificate Routes - Requires approved organization
+Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('certificates')->group(function () {
     
     // Get summary of all paths for authenticated user's organization
     Route::get('summary', [CertificateController::class, 'summary'])
@@ -159,7 +161,7 @@ Route::middleware('auth:sanctum')->prefix('certificates')->group(function () {
     // Delete certificate answers for specific path
     Route::delete('answers/{path}', [CertificateController::class, 'destroy'])
         ->name('certificates.destroy');
-    
+        
 });
 
 use App\Http\Controllers\Api\ModelController\ModelController;

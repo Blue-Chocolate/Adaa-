@@ -37,7 +37,66 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➋ Submit answers for authenticated user's organization
+     * ➋ Save answers (partial or complete) - allows incremental saving
+     */
+    public function saveAnswers(Request $request, string $path)
+    {
+        // Validate path
+        if (!$this->isValidPath($path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid path. Allowed: strategic, operational, hr'
+            ], 400);
+        }
+
+        // Get organization from authenticated user
+        $organization = $request->user()->organization;
+        
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found for this user'
+            ], 404);
+        }
+
+        // Validate request
+        $validator = $this->buildValidator($request, $path, false); // false = partial allowed
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Process answers (upsert - update existing or create new)
+        try {
+            $result = $this->repo->saveOrUpdateAnswers(
+                $organization->id, 
+                $request->all(), 
+                $path
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم حفظ الإجابات بنجاح ✅',
+                'data' => [
+                    'path' => $path,
+                    'saved_count' => $result['saved_count'],
+                    'total_questions' => $result['total_questions'],
+                    'is_complete' => $result['is_complete'],
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * ➌ Submit answers for authenticated user's organization (complete submission)
      */
     public function submitAnswers(Request $request, string $path)
     {

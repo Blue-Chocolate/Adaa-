@@ -21,7 +21,83 @@ class CertificateRepository
     }
 
     /**
-     * 💾 Save answers with attachments and calculate score
+     * 💾 Save or update answers incrementally (upsert logic)
+     */
+    public function saveOrUpdateAnswers(int $organizationId, array $data, string $path): array
+    {
+        return DB::transaction(function () use ($organizationId, $data, $path) {
+            $answersData = $data['answers'];
+            $savedCount = 0;
+
+            foreach ($answersData as $answerInput) {
+                $question = CertificateQuestion::findOrFail($answerInput['question_id']);
+                
+                // Ensure question belongs to the specified path
+                if ($question->path !== $path) {
+                    throw new \Exception("Question {$question->id} does not belong to path: {$path}");
+                }
+                
+                // 🧹 Normalize selected option
+                $selectedOption = trim($answerInput['selected_option'], '"\'');
+                $selectedOption = trim($selectedOption);
+                
+                // ✅ Validate option exists
+                if (!$this->isValidOption($question, $selectedOption)) {
+                    throw new \Exception("Invalid option selected for question {$question->id}");
+                }
+
+                // 📊 Calculate points
+                $points = $this->calculatePoints($question, $selectedOption);
+                $finalPoints = $points * $question->weight;
+
+                // 📎 Handle file upload or URL
+                $attachmentPath = null;
+                
+                if (!empty($answerInput['attachment'])) {
+                    // File upload
+                    $file = $answerInput['attachment'];
+                    $attachmentPath = $file->store("certificate_attachments/{$path}/{$organizationId}", 'public');
+                } elseif (!empty($answerInput['attachment_url'])) {
+                    // Pre-uploaded file URL - extract path from URL
+                    $attachmentPath = str_replace(asset('storage/'), '', $answerInput['attachment_url']);
+                    $attachmentPath = str_replace(url('storage/'), '', $attachmentPath);
+                }
+
+                // 💾 Upsert answer (update if exists, create if not)
+                CertificateAnswer::updateOrCreate(
+                    [
+                        'organization_id' => $organizationId,
+                        'certificate_question_id' => $question->id,
+                    ],
+                    [
+                        'selected_option' => $selectedOption,
+                        'points' => $points,
+                        'final_points' => $finalPoints,
+                        'attachment_path' => $attachmentPath,
+                    ]
+                );
+
+                $savedCount++;
+            }
+
+            // Calculate current totals
+            $totalQuestions = CertificateQuestion::where('path', $path)->count();
+            $answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
+                ->whereHas('question', function($query) use ($path) {
+                    $query->where('path', $path);
+                })
+                ->count();
+
+            return [
+                'saved_count' => $savedCount,
+                'total_questions' => $totalQuestions,
+                'is_complete' => $answeredQuestions >= $totalQuestions,
+            ];
+        });
+    }
+
+    /**
+     * 💾 Save answers with attachments and calculate score (complete submission)
      */
     public function saveAnswersWithAttachments(int $organizationId, array $data, string $path): array
     {

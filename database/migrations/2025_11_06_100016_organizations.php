@@ -26,6 +26,7 @@
             $table->string('address')->nullable();
             $table->string('license_number')->nullable();
             $table->string('executive_name')->nullable();
+            $table->enum('status', ['approved', 'pending', 'decline'])->default('pending');
 
             // Honorary Shield Track
             $table->decimal('shield_percentage', 5, 2)->nullable()->comment('Percentage determining the honorary shield level');
