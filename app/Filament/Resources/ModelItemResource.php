@@ -18,7 +18,7 @@ class ModelItemResource extends Resource
 {
     protected static ?string $model = ModelItem::class;
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationLabel = 'أدوات';
+    protected static ?string $navigationLabel = 'نماذج';
 
     // ✅ Filament v3 signature
     public static function form(Form $form): Form

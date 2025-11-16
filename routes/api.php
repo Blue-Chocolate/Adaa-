@@ -169,18 +169,18 @@ Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('certificat
 
 use App\Http\Controllers\Api\ModelController\ModelController;
 
-Route::get('/tools', [ModelController::class, 'index']);
-Route::get('/tools/{id}', [ModelController::class, 'show']);
+Route::get('/models', [ModelController::class, 'index']);
+Route::get('/models/{id}', [ModelController::class, 'show']);
 // For single attachment per model
-Route::get('tools/{id}/download', [ModelController::class, 'downloadAttachment']);
+Route::get('models/{id}/download', [ModelController::class, 'downloadAttachment']);
 
 // For multiple attachments per model
-Route::get('tools/{modelId}/attachments/{attachmentId}/download', [ModelController::class, 'downloadAttachmentById']);
+Route::get('models/{modelId}/attachments/{attachmentId}/download', [ModelController::class, 'downloadAttachmentById']);
 
 use App\Http\Controllers\Api\DesginController;
 
-Route::get('/desgins', [DesginController::class, 'index']);
-Route::get('/desgins/{id}', [DesginController::class, 'show']);
+Route::get('/dashbaords', [DesginController::class, 'index']);
+Route::get('/dashbaords/{id}', [DesginController::class, 'show']);
 
 use App\Http\Controllers\Api\NewsController\NewsController;
 
@@ -193,3 +193,10 @@ Route::prefix('news')->group(function () {
 use App\Http\Controllers\Api\SubscriptionController\SubscriptionController;
 Route::post('/subscribe/pro', [SubscriptionController::class, 'subscribeToPro'])
     ->middleware('auth:sanctum');
+
+use App\Http\Controllers\Api\ToolController\ToolController;
+Route::prefix('tools')->group(function () {
+    Route::get('/', [ToolController::class, 'index']);
+    Route::get('/{id}', [ToolController::class, 'show']);
+    Route::get('/{id}/download', [ToolController::class, 'download']);
+});
