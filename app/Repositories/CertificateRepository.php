@@ -21,7 +21,83 @@ class CertificateRepository
     }
 
     /**
-     * 💾 Save answers with attachments and calculate score
+     * 💾 Save or update answers incrementally (upsert logic)
+     */
+    public function saveOrUpdateAnswers(int $organizationId, array $data, string $path): array
+    {
+        return DB::transaction(function () use ($organizationId, $data, $path) {
+            $answersData = $data['answers'];
+            $savedCount = 0;
+
+            foreach ($answersData as $answerInput) {
+                $question = CertificateQuestion::findOrFail($answerInput['question_id']);
+                
+                // Ensure question belongs to the specified path
+                if ($question->path !== $path) {
+                    throw new \Exception("Question {$question->id} does not belong to path: {$path}");
+                }
+                
+                // 🧹 Normalize selected option
+                $selectedOption = trim($answerInput['selected_option'], '"\'');
+                $selectedOption = trim($selectedOption);
+                
+                // ✅ Validate option exists
+                if (!$this->isValidOption($question, $selectedOption)) {
+                    throw new \Exception("Invalid option selected for question {$question->id}");
+                }
+
+                // 📊 Calculate points
+                $points = $this->calculatePoints($question, $selectedOption);
+                $finalPoints = $points * $question->weight;
+
+                // 📎 Handle file upload or URL
+                $attachmentPath = null;
+                
+                if (!empty($answerInput['attachment'])) {
+                    // File upload
+                    $file = $answerInput['attachment'];
+                    $attachmentPath = $file->store("certificate_attachments/{$path}/{$organizationId}", 'public');
+                } elseif (!empty($answerInput['attachment_url'])) {
+                    // Pre-uploaded file URL - extract path from URL
+                    $attachmentPath = str_replace(asset('storage/'), '', $answerInput['attachment_url']);
+                    $attachmentPath = str_replace(url('storage/'), '', $attachmentPath);
+                }
+
+                // 💾 Upsert answer (update if exists, create if not)
+                CertificateAnswer::updateOrCreate(
+                    [
+                        'organization_id' => $organizationId,
+                        'certificate_question_id' => $question->id,
+                    ],
+                    [
+                        'selected_option' => $selectedOption,
+                        'points' => $points,
+                        'final_points' => $finalPoints,
+                        'attachment_path' => $attachmentPath,
+                    ]
+                );
+
+                $savedCount++;
+            }
+
+            // Calculate current totals
+            $totalQuestions = CertificateQuestion::where('path', $path)->count();
+            $answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
+                ->whereHas('question', function($query) use ($path) {
+                    $query->where('path', $path);
+                })
+                ->count();
+
+            return [
+                'saved_count' => $savedCount,
+                'total_questions' => $totalQuestions,
+                'is_complete' => $answeredQuestions >= $totalQuestions,
+            ];
+        });
+    }
+
+    /**
+     * 💾 Save answers with attachments and calculate score (complete submission)
      */
     public function saveAnswersWithAttachments(int $organizationId, array $data, string $path): array
     {
@@ -32,9 +108,9 @@ class CertificateRepository
             foreach ($answersData as $answerInput) {
                 $question = CertificateQuestion::findOrFail($answerInput['question_id']);
                 
-                // 🔍 Verify question belongs to the specified path
+                // Ensure question belongs to the specified path
                 if ($question->path !== $path) {
-                    throw new \Exception("Question {$question->id} does not belong to path '{$path}'");
+                    throw new \Exception("Question {$question->id} does not belong to path: {$path}");
                 }
                 
                 // 🧹 Normalize selected option
@@ -59,10 +135,7 @@ class CertificateRepository
                 $attachmentPath = null;
                 if (!empty($answerInput['attachment'])) {
                     $file = $answerInput['attachment'];
-                    $attachmentPath = $file->store(
-                        "certificate_attachments/{$path}/{$organizationId}", 
-                        'public'
-                    );
+                    $attachmentPath = $file->store("certificate_attachments/{$path}/{$organizationId}", 'public');
                 }
 
                 // 💾 Store answer
@@ -78,31 +151,48 @@ class CertificateRepository
                 $totalScore += $finalPoints;
             }
 
-            // 🏆 Calculate rank for this path
+            // 🏆 Calculate rank
             $rank = $this->calculateRank($totalScore, $path);
             
-            // 📝 Update organization's overall scores
-            $this->updateOrganizationScores($organizationId);
+            // 📝 Update organization (this updates global score - you may want path-specific storage)
+            $organization = Organization::findOrFail($organizationId);
+            $organization->update([
+                'certificate_final_score' => $totalScore,
+                'certificate_final_rank' => $rank,
+            ]);
 
             return [
-                'score' => $totalScore,
-                'rank' => $rank,
-                'max_possible_score' => $this->getMaxScore($path),
+                'final_score' => $totalScore,
+                'final_rank' => $rank,
             ];
         });
     }
 
     /**
-     * 🔄 Update existing answers for a specific path
+     * 🔄 Update existing answers for specific path
      */
     public function updateAnswersWithAttachments(int $organizationId, array $data, string $path): array
     {
         return DB::transaction(function () use ($organizationId, $data, $path) {
             // 🗑️ Delete old answers and files for this path only
-            $this->deleteCertificateAnswersByPath(
-                Organization::findOrFail($organizationId), 
-                $path
-            );
+            $organization = Organization::with(['certificateAnswers' => function($query) use ($path) {
+                $query->whereHas('question', function($q) use ($path) {
+                    $q->where('path', $path);
+                });
+            }])->findOrFail($organizationId);
+            
+            foreach ($organization->certificateAnswers as $answer) {
+                if ($answer->attachment_path && Storage::disk('public')->exists($answer->attachment_path)) {
+                    Storage::disk('public')->delete($answer->attachment_path);
+                }
+            }
+            
+            // Delete answers for this path only
+            CertificateAnswer::where('organization_id', $organizationId)
+                ->whereHas('question', function($query) use ($path) {
+                    $query->where('path', $path);
+                })
+                ->delete();
 
             // 💾 Save new answers
             return $this->saveAnswersWithAttachments($organizationId, $data, $path);
@@ -110,90 +200,50 @@ class CertificateRepository
     }
 
     /**
-     * 🗑️ Delete certificate answers for a specific path
+     * 🗑️ Delete certificate answers and files for specific path
      */
-    public function deleteCertificateAnswersByPath(Organization $organization, string $path): void
+    public function deleteCertificateAnswers(Organization $organization, string $path): void
     {
         DB::transaction(function () use ($organization, $path) {
-            // Get answers for this path only
+            // Load answers for specific path
             $answers = $organization->certificateAnswers()
                 ->whereHas('question', function($query) use ($path) {
                     $query->where('path', $path);
                 })
                 ->get();
 
-            // Delete files
             foreach ($answers as $answer) {
                 if ($answer->attachment_path && Storage::disk('public')->exists($answer->attachment_path)) {
                     Storage::disk('public')->delete($answer->attachment_path);
                 }
             }
 
-            // Delete answer records
-            CertificateAnswer::where('organization_id', $organization->id)
+            // Delete answers for this path
+            $organization->certificateAnswers()
                 ->whereHas('question', function($query) use ($path) {
                     $query->where('path', $path);
                 })
                 ->delete();
-
-            // Recalculate overall scores
-            $this->updateOrganizationScores($organization->id);
-        });
-    }
-
-    /**
-     * 🗑️ Delete all certificate answers and files for organization
-     */
-    public function deleteCertificateAnswers(Organization $organization): void
-    {
-        DB::transaction(function () use ($organization) {
-            foreach ($organization->certificateAnswers as $answer) {
-                if ($answer->attachment_path && Storage::disk('public')->exists($answer->attachment_path)) {
-                    Storage::disk('public')->delete($answer->attachment_path);
-                }
+            
+            // Recalculate overall score if needed (or set to null if no answers remain)
+            $remainingAnswers = $organization->certificateAnswers()->count();
+            
+            if ($remainingAnswers === 0) {
+                $organization->update([
+                    'certificate_final_score' => null,
+                    'certificate_final_rank' => null,
+                ]);
+            } else {
+                // Recalculate based on remaining answers
+                $totalScore = $organization->certificateAnswers()->sum('final_points');
+                $rank = $this->calculateRank($totalScore, 'strategic'); // Or determine dynamically
+                
+                $organization->update([
+                    'certificate_final_score' => $totalScore,
+                    'certificate_final_rank' => $rank,
+                ]);
             }
-
-            $organization->certificateAnswers()->delete();
-            
-            $organization->update([
-                'certificate_final_score' => null,
-                'certificate_final_rank' => null,
-            ]);
         });
-    }
-
-    /**
-     * 📊 Update organization's overall certificate scores
-     */
-    private function updateOrganizationScores(int $organizationId): void
-    {
-        $organization = Organization::with('certificateAnswers')->findOrFail($organizationId);
-        
-        $totalScore = $organization->certificateAnswers->sum('final_points');
-        
-        // Calculate overall rank based on combined scores from all paths
-        $allPaths = ['strategic', 'operational', 'hr'];
-        $combinedMaxScore = collect($allPaths)->sum(fn($path) => $this->getMaxScore($path));
-        
-        $overallRank = null;
-        if ($totalScore > 0) {
-            $normalizedScore = ($combinedMaxScore > 0) 
-                ? ($totalScore / $combinedMaxScore) * 100 
-                : 0;
-            
-            $overallRank = match (true) {
-                $normalizedScore >= 86 => 'diamond',
-                $normalizedScore >= 76 => 'gold',
-                $normalizedScore >= 66 => 'silver',
-                $normalizedScore >= 55 => 'bronze',
-                default => 'bronze',
-            };
-        }
-
-        $organization->update([
-            'certificate_final_score' => $totalScore,
-            'certificate_final_rank' => $overallRank,
-        ]);
     }
 
     /**
@@ -224,9 +274,9 @@ class CertificateRepository
     }
 
     /**
-     * 🏆 Calculate rank based on score and path (public for controller use)
+     * 🏆 Calculate rank based on score and path
      */
-    public function calculateRank(float $score, string $path): string
+    private function calculateRank(float $score, string $path): string
     {
         $maxScore = $this->getMaxScore($path);
         $normalizedScore = ($maxScore > 0) ? ($score / $maxScore) * 100 : 0;
@@ -241,9 +291,9 @@ class CertificateRepository
     }
 
     /**
-     * 📈 Get maximum possible score for path (public for controller use)
+     * 📈 Get maximum possible score for path
      */
-    public function getMaxScore(string $path): float
+    private function getMaxScore(string $path): float
     {
         return CertificateQuestion::where('path', $path)
             ->get()

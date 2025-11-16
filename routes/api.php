@@ -113,7 +113,10 @@ Route::prefix('shield')->group(function () {
 | Shield Routes - Protected (Authentication Required)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->prefix('shield')->group(function () {
+use App\Http\Controllers\Api\CertificateController\CertificateController;
+
+// Shield Routes - Requires approved organization
+Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('shield')->group(function () {
     
     // Questions - Get all questions with user's saved answers
     Route::get('/questions', [ShieldQuestionsController::class, 'index']);
@@ -134,31 +137,35 @@ Route::middleware('auth:sanctum')->prefix('shield')->group(function () {
 
 });
 
-use App\Http\Controllers\Api\CertificateController\CertificateController;
-
-Route::prefix('certificates')->group(function () {
+// Certificate Routes - Requires approved organization
+Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('certificates')->group(function () {
     
-    // Get questions by path
+    // Get summary of all paths for authenticated user's organization
+    Route::get('summary', [CertificateController::class, 'summary'])
+        ->name('certificates.summary');
+    
+    // Get questions by path (strategic, operational, hr)
     Route::get('questions/{path}', [CertificateController::class, 'getQuestionsByPath'])
         ->name('certificates.questions');
     
-    // Submit answers for organization
-    Route::post('organizations/{organizationId}/answers', [CertificateController::class, 'submitAnswers'])
+    // Submit answers for authenticated user's organization (specific path)
+    Route::post('answers/{path}', [CertificateController::class, 'submitAnswers'])
         ->name('certificates.submit');
     
-    // Show certificate details
-    Route::get('organizations/{organizationId}', [CertificateController::class, 'show'])
+    // Show certificate details for specific path
+    Route::get('answers/{path}', [CertificateController::class, 'show'])
         ->name('certificates.show');
     
-    // Update answers
-    Route::put('organizations/{organizationId}/answers', [CertificateController::class, 'updateAnswers'])
+    // Update answers for specific path
+    Route::put('answers/{path}', [CertificateController::class, 'updateAnswers'])
         ->name('certificates.update');
     
-    // Delete certificate answers
-    Route::delete('organizations/{organizationId}/answers', [CertificateController::class, 'destroy'])
+    // Delete certificate answers for specific path
+    Route::delete('answers/{path}', [CertificateController::class, 'destroy'])
         ->name('certificates.destroy');
-    
+        
 });
+
 use App\Http\Controllers\Api\ModelController\ModelController;
 
 Route::get('/models', [ModelController::class, 'index']);
@@ -166,8 +173,8 @@ Route::get('/models/{id}', [ModelController::class, 'show']);
 
 use App\Http\Controllers\Api\DesginController;
 
-Route::get('/Desgins', [DesginController::class, 'index']);
-Route::get('/Desgins/{id}', [DesginController::class, 'show']);
+Route::get('/desgins', [DesginController::class, 'index']);
+Route::get('/desgins/{id}', [DesginController::class, 'show']);
 
 use App\Http\Controllers\Api\NewsController\NewsController;
 

@@ -34,6 +34,11 @@ class DumpAuthenticationController extends Controller
                 'message' => 'User registered successfully',
                 'token'   => $token,
                 'user'    => $user,
+                'flags' => [
+                    'has_organization' => false,
+                    'organization_status' => null,
+                    'email_verified' => $user->email_verified_at !== null,
+                ],
             ], 201);
 
         } catch (\Throwable $e) {
@@ -69,10 +74,44 @@ class DumpAuthenticationController extends Controller
 
             $token = $user->createToken('api_token')->plainTextToken;
 
+            // Load organization relationship
+            $user->load('organization');
+
+            // Prepare account flags
+            $flags = [
+                'email_verified' => $user->email_verified_at !== null,
+                'has_organization' => $user->organization !== null,
+                'organization_status' => $user->organization?->status,
+                'can_access_features' => $user->organization?->status === 'approved',
+            ];
+
             return response()->json([
                 'message' => 'Login successful',
                 'token'   => $token,
-                'user'    => $user,
+                'user'    => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'email_verified_at' => $user->email_verified_at,
+                    'user_priviliages' => $user->user_priviliages,
+                    'created_at' => $user->created_at,
+                ],
+                'organization' => $user->organization ? [
+                    'id' => $user->organization->id,
+                    'name' => $user->organization->name,
+                    'sector' => $user->organization->sector,
+                    'email' => $user->organization->email,
+                    'phone' => $user->organization->phone,
+                    'status' => $user->organization->status,
+                    'shield_percentage' => $user->organization->shield_percentage,
+                    'shield_rank' => $user->organization->shield_rank,
+                    'certificate_final_score' => $user->organization->certificate_final_score,
+                    'certificate_final_rank' => $user->organization->certificate_final_rank,
+                    'established_at' => $user->organization->established_at,
+                    'created_at' => $user->organization->created_at,
+                ] : null,
+                'flags' => $flags,
             ]);
 
         } catch (ValidationException $e) {
@@ -109,12 +148,67 @@ class DumpAuthenticationController extends Controller
     }
 
     /**
-     * Return current authenticated user
+     * Return current authenticated user with fresh data
      */
     public function me(Request $request)
     {
         try {
-            return response()->json($request->user());
+            // Get fresh user data with organization
+            $user = User::with('organization')->find($request->user()->id);
+
+            if (!$user) {
+                return response()->json([
+                    'error' => 'User not found',
+                ], 404);
+            }
+
+            // Get current token
+            $currentToken = $request->user()->currentAccessToken();
+
+            // Prepare account flags
+            $flags = [
+                'email_verified' => $user->email_verified_at !== null,
+                'has_organization' => $user->organization !== null,
+                'organization_status' => $user->organization?->status,
+                'can_access_features' => $user->organization?->status === 'approved',
+            ];
+
+            return response()->json([
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'email_verified_at' => $user->email_verified_at,
+                    'user_priviliages' => $user->user_priviliages,
+
+                ],
+                'organization' => $user->organization ? [
+                    'id' => $user->organization->id,
+                    'name' => $user->organization->name,
+                    'sector' => $user->organization->sector,
+                    'email' => $user->organization->email,
+                    'phone' => $user->organization->phone,
+                    'address' => $user->organization->address,
+                    'license_number' => $user->organization->license_number,
+                    'executive_name' => $user->organization->executive_name,
+                    'status' => $user->organization->status,
+                    'shield_percentage' => $user->organization->shield_percentage,
+                    'shield_rank' => $user->organization->shield_rank,
+                    'certificate_final_score' => $user->organization->certificate_final_score,
+                    'certificate_final_rank' => $user->organization->certificate_final_rank,
+                    'established_at' => $user->organization->established_at,
+
+                ] : null,
+                'token' => [
+                    'name' => $currentToken->name,
+                    'abilities' => $currentToken->abilities,
+                    'created_at' => $currentToken->created_at,
+                    'last_used_at' => $currentToken->last_used_at,
+                ],
+                'flags' => $flags,
+            ]);
+
         } catch (\Throwable $e) {
             Log::error('Me Endpoint Error: ' . $e->getMessage());
 

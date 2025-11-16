@@ -1,10 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\CertificateController;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\CertificateRepository;
-use App\Models\Organization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -12,8 +11,8 @@ class CertificateController extends Controller
 {
     protected CertificateRepository $repo;
 
-    // 🎯 Allowed paths configuration
-    private const ALLOWED_PATHS = ['strategic', 'operational', 'hr'];
+    // Valid certificate paths
+    private const VALID_PATHS = ['strategic', 'operational', 'hr'];
 
     public function __construct(CertificateRepository $repo)
     {
@@ -38,18 +37,30 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➋ Submit answers for an organization (specific path)
+     * ➋ Save answers (partial or complete) - allows incremental saving
      */
-    public function submitAnswers(Request $request, int $organizationId, string $path)
+    public function saveAnswers(Request $request, string $path)
     {
+        // Validate path
         if (!$this->isValidPath($path)) {
-            return response()->json(['error' => 'Invalid path'], 400);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid path. Allowed: strategic, operational, hr'
+            ], 400);
         }
 
-        $organization = Organization::findOrFail($organizationId);
+        // Get organization from authenticated user
+        $organization = $request->user()->organization;
         
-        // ✅ Validate request
-        $validator = $this->buildValidator($request);
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found for this user'
+            ], 404);
+        }
+
+        // Validate request
+        $validator = $this->buildValidator($request, $path, false); // false = partial allowed
         
         if ($validator->fails()) {
             return response()->json([
@@ -58,22 +69,22 @@ class CertificateController extends Controller
             ], 422);
         }
 
-        // 💾 Process answers
+        // Process answers (upsert - update existing or create new)
         try {
-            $result = $this->repo->saveAnswersWithAttachments(
-                $organizationId, 
+            $result = $this->repo->saveOrUpdateAnswers(
+                $organization->id, 
                 $request->all(), 
                 $path
             );
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم إرسال الإجابات والملفات بنجاح ✅',
+                'message' => 'تم حفظ الإجابات بنجاح ✅',
                 'data' => [
                     'path' => $path,
-                    'score' => $result['score'],
-                    'rank' => $result['rank'],
-                    'max_possible_score' => $result['max_possible_score'],
+                    'saved_count' => $result['saved_count'],
+                    'total_questions' => $result['total_questions'],
+                    'is_complete' => $result['is_complete'],
                 ]
             ]);
         } catch (\Exception $e) {
@@ -85,94 +96,150 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➌ Get certificate summary for organization (all paths)
+     * ➌ Submit answers for authenticated user's organization (complete submission)
      */
-    public function show(int $organizationId)
+    public function submitAnswers(Request $request, string $path)
     {
-        $organization = Organization::with([
-            'certificateAnswers.question.axis',
-            'certificateAnswers' => function($query) {
-                $query->orderBy('certificate_question_id');
-            }
-        ])->findOrFail($organizationId);
-
-        // 📊 Group answers by path
-        $answersByPath = $organization->certificateAnswers->groupBy(function($answer) {
-            return $answer->question->path;
-        });
-
-        $pathSummaries = [];
-        foreach (self::ALLOWED_PATHS as $path) {
-            $pathAnswers = $answersByPath->get($path, collect());
-            
-            $pathSummaries[$path] = [
-                'completed' => $pathAnswers->isNotEmpty(),
-                'score' => $pathAnswers->sum('final_points'),
-                'rank' => $this->repo->calculateRank(
-                    $pathAnswers->sum('final_points'), 
-                    $path
-                ),
-                'answers_count' => $pathAnswers->count(),
-            ];
+        // Validate path
+        if (!$this->isValidPath($path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid path. Allowed: strategic, operational, hr'
+            ], 400);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'organization' => $organization,
-                'overall_summary' => [
-                    'total_score' => $organization->certificate_final_score,
-                    'overall_rank' => $organization->certificate_final_rank,
-                ],
-                'path_summaries' => $pathSummaries,
-                'answers' => $organization->certificateAnswers,
-            ]
-        ]);
+        // Get organization from authenticated user
+        $organization = $request->user()->organization;
+        
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found for this user'
+            ], 404);
+        }
+
+        // Check if answers already exist for this path
+        $existingAnswers = $organization->certificateAnswers()
+            ->whereHas('question', function($query) use ($path) {
+                $query->where('path', $path);
+            })
+            ->exists();
+
+        if ($existingAnswers) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Answers already submitted for this path. Use update endpoint instead.'
+            ], 409);
+        }
+
+        // Validate request
+        $validator = $this->buildValidator($request, $path);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Process answers
+        try {
+            $result = $this->repo->saveAnswersWithAttachments(
+                $organization->id, 
+                $request->all(), 
+                $path
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم إرسال الإجابات والملفات بنجاح ✅',
+                'data' => [
+                    'path' => $path,
+                    'final_score' => $result['final_score'],
+                    'final_rank' => $result['final_rank'],
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
     }
 
     /**
-     * ➍ Get detailed results for a specific path
+     * ➌ Show certificate details with all answers for specific path
      */
-    public function showPathResults(int $organizationId, string $path)
+    public function show(Request $request, string $path)
     {
         if (!$this->isValidPath($path)) {
-            return response()->json(['error' => 'Invalid path'], 400);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid path'
+            ], 400);
         }
 
-        $organization = Organization::with([
+        $organization = $request->user()->organization;
+        
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found'
+            ], 404);
+        }
+
+        // Load answers for specific path only
+        $organization->load([
             'certificateAnswers' => function($query) use ($path) {
                 $query->whereHas('question', function($q) use ($path) {
                     $q->where('path', $path);
-                })->with('question.axis');
+                })
+                ->with('question.axis')
+                ->orderBy('certificate_question_id');
             }
-        ])->findOrFail($organizationId);
+        ]);
 
+        // Get path-specific data (if you want to store per-path scores)
         $pathAnswers = $organization->certificateAnswers;
 
         return response()->json([
             'success' => true,
             'data' => [
+                'organization' => [
+                    'id' => $organization->id,
+                    'name' => $organization->name,
+                ],
                 'path' => $path,
-                'score' => $pathAnswers->sum('final_points'),
-                'rank' => $this->repo->calculateRank($pathAnswers->sum('final_points'), $path),
-                'max_possible_score' => $this->repo->getMaxScore($path),
+                'certificate_score' => $organization->certificate_final_score,
+                'certificate_rank' => $organization->certificate_final_rank,
                 'answers' => $pathAnswers,
+                'total_questions' => $pathAnswers->count(),
             ]
         ]);
     }
 
     /**
-     * ➎ Update answers for a specific path
+     * ➍ Update answers for specific path
      */
-    public function updateAnswers(Request $request, int $organizationId, string $path)
+    public function updateAnswers(Request $request, string $path)
     {
         if (!$this->isValidPath($path)) {
-            return response()->json(['error' => 'Invalid path'], 400);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid path'
+            ], 400);
         }
 
-        $organization = Organization::findOrFail($organizationId);
+        $organization = $request->user()->organization;
         
-        $validator = $this->buildValidator($request);
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found'
+            ], 404);
+        }
+
+        $validator = $this->buildValidator($request, $path);
         
         if ($validator->fails()) {
             return response()->json([
@@ -183,7 +250,7 @@ class CertificateController extends Controller
 
         try {
             $result = $this->repo->updateAnswersWithAttachments(
-                $organizationId, 
+                $organization->id, 
                 $request->all(), 
                 $path
             );
@@ -193,8 +260,8 @@ class CertificateController extends Controller
                 'message' => 'تم تحديث الإجابات بنجاح ✅',
                 'data' => [
                     'path' => $path,
-                    'score' => $result['score'],
-                    'rank' => $result['rank'],
+                    'final_score' => $result['final_score'],
+                    'final_rank' => $result['final_rank'],
                 ]
             ]);
         } catch (\Exception $e) {
@@ -206,22 +273,32 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➏ Delete answers for a specific path
+     * ➎ Delete certificate answers for specific path
      */
-    public function destroyPath(int $organizationId, string $path)
+    public function destroy(Request $request, string $path)
     {
         if (!$this->isValidPath($path)) {
-            return response()->json(['error' => 'Invalid path'], 400);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid path'
+            ], 400);
         }
 
-        $organization = Organization::findOrFail($organizationId);
+        $organization = $request->user()->organization;
         
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found'
+            ], 404);
+        }
+
         try {
-            $this->repo->deleteCertificateAnswersByPath($organization, $path);
+            $this->repo->deleteCertificateAnswers($organization, $path);
 
             return response()->json([
                 'success' => true,
-                'message' => "تم حذف إجابات المسار {$path} بنجاح ✅"
+                'message' => 'تم الحذف بنجاح ✅'
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -232,45 +309,79 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➐ Delete all certificate data for organization
+     * ➏ Get all paths summary for organization
      */
-    public function destroy(int $organizationId)
+    public function summary(Request $request)
     {
-        $organization = Organization::with('certificateAnswers')->findOrFail($organizationId);
+        $organization = $request->user()->organization;
         
-        try {
-            $this->repo->deleteCertificateAnswers($organization);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'تم حذف جميع البيانات بنجاح ✅'
-            ]);
-        } catch (\Exception $e) {
+        if (!$organization) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+                'message' => 'Organization not found'
+            ], 404);
         }
+
+        $summary = [];
+
+        foreach (self::VALID_PATHS as $path) {
+            $answersCount = $organization->certificateAnswers()
+                ->whereHas('question', function($query) use ($path) {
+                    $query->where('path', $path);
+                })
+                ->count();
+
+            $totalQuestions = \App\Models\CertificateQuestion::where('path', $path)->count();
+
+            $summary[$path] = [
+                'answered' => $answersCount,
+                'total' => $totalQuestions,
+                'completed' => $answersCount >= $totalQuestions,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'organization' => [
+                    'id' => $organization->id,
+                    'name' => $organization->name,
+                ],
+                'overall_score' => $organization->certificate_final_score,
+                'overall_rank' => $organization->certificate_final_rank,
+                'paths' => $summary,
+            ]
+        ]);
     }
 
     /**
      * 🎯 Build validator for answers submission
      */
-    private function buildValidator(Request $request)
+    private function buildValidator(Request $request, string $path)
     {
         return Validator::make($request->all(), [
             'answers' => 'required|array|min:1',
-            'answers.*.question_id' => 'required|integer|exists:certificate_questions,id',
+            'answers.*.question_id' => [
+                'required',
+                'integer',
+                'exists:certificate_questions,id',
+                function ($attribute, $value, $fail) use ($path) {
+                    $question = \App\Models\CertificateQuestion::find($value);
+                    if ($question && $question->path !== $path) {
+                        $fail("Question ID {$value} does not belong to path: {$path}");
+                    }
+                },
+            ],
             'answers.*.selected_option' => 'required|string',
             'answers.*.attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
         ]);
     }
 
     /**
-     * ✅ Validate path
+     * Check if path is valid
      */
     private function isValidPath(string $path): bool
     {
-        return in_array($path, self::ALLOWED_PATHS);
+        return in_array($path, self::VALID_PATHS);
     }
 }
