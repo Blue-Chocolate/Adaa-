@@ -169,8 +169,13 @@ Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('certificat
 
 use App\Http\Controllers\Api\ModelController\ModelController;
 
-Route::get('/models', [ModelController::class, 'index']);
-Route::get('/models/{id}', [ModelController::class, 'show']);
+Route::get('/tools', [ModelController::class, 'index']);
+Route::get('/tools/{id}', [ModelController::class, 'show']);
+// For single attachment per model
+Route::get('tools/{id}/download', [ModelController::class, 'downloadAttachment']);
+
+// For multiple attachments per model
+Route::get('tools/{modelId}/attachments/{attachmentId}/download', [ModelController::class, 'downloadAttachmentById']);
 
 use App\Http\Controllers\Api\DesginController;
 
