@@ -170,22 +170,28 @@ Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('shield')->
 Route::middleware(['auth:sanctum'])->prefix('certificates')->group(function () {
     
     // ➊ Get questions by path
-    Route::get('/questions/{path}', [CertificateController::class, 'getQuestionsByPath']);
+    Route::get('/{path}/questions', [CertificateController::class, 'getQuestionsByPath']);
     
-    // ➋ Save answers (any number, no modifications allowed once saved)
-    Route::post('/{path}/save', [CertificateController::class, 'saveAnswers']);
+    // ➋ Save answers (with file upload or URL)
+    Route::post('/{path}/answers', [CertificateController::class, 'saveAnswers']);
     
-    // ➌ Submit - Calculate and store final score
+    // ➌ Submit certificate for a path
     Route::post('/{path}/submit', [CertificateController::class, 'submitCertificate']);
     
-    // ➏ Bulk upload answers from URLs (JSON)
-    Route::post('/upload/{path}', [CertificateController::class, 'uploadAnswers']);
+    // ➏ Bulk upload answers (JSON with URLs)
+    Route::post('/{path}/upload-answers', [CertificateController::class, 'uploadAnswers']);
     
-    // ➐ Download certificate data for a specific path
-    Route::get('/download/{path}', [CertificateController::class, 'downloadPath']);
+    // ➐ Download path data
+    Route::get('/{path}/download', [CertificateController::class, 'downloadPath']);
     
-    // ➑ Download overall certificate data (all paths)
+    // ➑ Download overall data (all paths)
     Route::get('/download', [CertificateController::class, 'downloadOverall']);
+    
+    // ➒ Get user summary
+    Route::get('/summary', [CertificateController::class, 'summary']);
+    
+    // ➓ Upload file only (get URL back)
+    Route::post('/{path}/upload', [CertificateController::class, 'uploadFile']);
 });
     Route::get('/analytics', [CertificateController::class, 'analytics']);
     

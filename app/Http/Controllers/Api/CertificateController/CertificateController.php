@@ -339,6 +339,89 @@ class CertificateController extends Controller
     }
 
     /**
+     * ➒ Get user certificate summary
+     */
+    public function summary(Request $request)
+    {
+        $organization = $request->user()->organization;
+        
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found for this user'
+            ], 404);
+        }
+
+        try {
+            $summary = $this->repo->getUserSummary($organization->id);
+
+            return response()->json([
+                'success' => true,
+                'data' => $summary
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ➓ Upload file only - returns URL without saving answer
+     */
+    public function uploadFile(Request $request, string $path)
+    {
+        if (!$this->isValidPath($path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid path. Allowed: strategic, operational, hr'
+            ], 400);
+        }
+
+        $organization = $request->user()->organization;
+        
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found for this user'
+            ], 404);
+        }
+
+        // Validate file upload
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $file = $request->file('file');
+            $attachmentPath = $file->store("certificate_attachments/{$path}/{$organization->id}", 'public');
+            $attachmentUrl = asset('storage/' . $attachmentPath);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم رفع الملف بنجاح ✅',
+                'data' => [
+                    'attachment_path' => $attachmentPath,
+                    'attachment_url' => $attachmentUrl,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل رفع الملف: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Check if path is valid
      */
     private function isValidPath(string $path): bool

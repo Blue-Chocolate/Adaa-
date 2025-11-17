@@ -462,141 +462,22 @@ class CertificateRepository
                 }
             }
 
+
             $totalQuestions = CertificateQuestion::where('path', $path)->count();
-            $answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
-                ->whereHas('question', function($query) use ($path) {
-                    $query->where('path', $path);
-                })
-                ->count();
+$answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
+    ->whereHas('question', function($query) use ($path) {
+        $query->where('path', $path);
+    })
+    ->count();
 
-            return [
-                'saved_count' => $savedCount,
-                'skipped_count' => $skippedCount,
-                'errors' => $errors,
-                'answered_questions' => $answeredQuestions,
-                'total_questions' => $totalQuestions,
-                'is_complete' => $answeredQuestions >= $totalQuestions,
-            ];
+return [
+    'saved_count' => $savedCount,
+    'skipped_count' => $skippedCount,
+    'errors' => $errors,
+    'answered_questions' => $answeredQuestions,
+    'total_questions' => $totalQuestions,
+    'is_complete' => $answeredQuestions >= $totalQuestions,
+];
         });
-    }
-
-    /**
-     * 📥 Download certificate data for a specific path
-     */
-    public function downloadPathData(int $organizationId, string $path): array
-    {
-        $organization = Organization::findOrFail($organizationId);
-        
-        $axes = CertificateAxis::where('path', $path)
-            ->with(['questions' => function($query) {
-                $query->orderBy('id');
-            }])
-            ->orderBy('id')
-            ->get();
-
-        $pathData = [];
-        $totalScore = 0;
-
-        foreach ($axes as $axis) {
-            $axisQuestions = [];
-            
-            foreach ($axis->questions as $question) {
-                $answer = CertificateAnswer::where('organization_id', $organizationId)
-                    ->where('certificate_question_id', $question->id)
-                    ->first();
-
-                $axisQuestions[] = [
-                    'question_id' => $question->id,
-                    'question_text' => $question->question_text,
-                    'options' => $question->options,
-                    'selected_option' => $answer ? $answer->selected_option : null,
-                    'points' => $answer ? $answer->points : 0,
-                    'final_points' => $answer ? $answer->final_points : 0,
-                    'weight' => $question->weight,
-                    'attachment_path' => $answer && $answer->attachment_path 
-                        ? asset('storage/' . $answer->attachment_path) 
-                        : null,
-                    'attachment_required' => $question->attachment_required,
-                    'answered' => $answer !== null,
-                ];
-
-                if ($answer) {
-                    $totalScore += $answer->final_points;
-                }
-            }
-
-            $pathData[] = [
-                'axis_id' => $axis->id,
-                'axis_name' => $axis->name,
-                'axis_description' => $axis->description,
-                'axis_weight' => $axis->weight,
-                'questions' => $axisQuestions,
-            ];
-        }
-
-        $totalQuestions = CertificateQuestion::where('path', $path)->count();
-        $answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
-            ->whereHas('question', function($query) use ($path) {
-                $query->where('path', $path);
-            })
-            ->count();
-
-        return [
-            'organization' => [
-                'id' => $organization->id,
-                'name' => $organization->name,
-                'email' => $organization->email,
-            ],
-            'path' => $path,
-            'path_score' => $totalScore,
-            'axes' => $pathData,
-            'summary' => [
-                'answered_questions' => $answeredQuestions,
-                'total_questions' => $totalQuestions,
-                'completion_percentage' => $totalQuestions > 0 
-                    ? round(($answeredQuestions / $totalQuestions) * 100, 2) 
-                    : 0,
-                'is_complete' => $answeredQuestions >= $totalQuestions,
-            ],
-        ];
-    }
-
-    /**
-     * 📥 Download overall certificate data (all paths)
-     */
-    public function downloadOverallData(int $organizationId): array
-    {
-        $organization = Organization::findOrFail($organizationId);
-        $validPaths = ['strategic', 'operational', 'hr'];
-        
-        $allPathsData = [];
-        $totalScore = 0;
-        $completedPaths = 0;
-
-        foreach ($validPaths as $path) {
-            $pathData = $this->downloadPathData($organizationId, $path);
-            
-            $allPathsData[$path] = $pathData;
-            $totalScore += $pathData['path_score'];
-            
-            if ($pathData['summary']['is_complete']) {
-                $completedPaths++;
-            }
-        }
-
-        return [
-            'organization' => [
-                'id' => $organization->id,
-                'name' => $organization->name,
-                'email' => $organization->email,
-                'phone' => $organization->phone ?? null,
-            ],
-            'overall_score' => $organization->certificate_final_score,
-            'overall_rank' => $organization->certificate_final_rank,
-            'completed_paths' => $completedPaths,
-            'total_paths' => count($validPaths),
-            'all_paths_completed' => $completedPaths === count($validPaths),
-            'paths_data' => $allPathsData,
-        ];
     }
 }
