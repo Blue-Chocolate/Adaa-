@@ -9,6 +9,8 @@
 - [Releases](#releases)
 - [Blogs](#blogs)
 - [Models](#models)
+- [Subscription](#subscription)
+- [Certificate](#certificate)
 
 ---
 
@@ -334,6 +336,124 @@ GET /api/releases/1/download
 **Response:** File download
 
 ---
+## Subscription 
+
+This API allows managing users, subscription plans, and retrieving subscription information in a Laravel application.
+
+Base URL
+http://your-domain.com/api
+
+Authentication
+
+All endpoints require authenticated users using Laravel's API authentication (sanctum or passport).
+
+Endpoints
+1. Subscribe a user to Pro Plan
+
+POST /subscriptions/subscribe-pro
+
+Description: Subscribes the authenticated user to the "Pro" plan. Automatically deactivates existing subscriptions.
+
+Request:
+
+POST /api/subscriptions/subscribe-pro
+Authorization: Bearer {token}
+
+
+Response:
+
+{
+  "message": "You are now subscribed to Pro.",
+  "subscription": {
+    "id": 5,
+    "user_id": 2,
+    "plan_id": 1,
+    "starts_at": "2025-11-17",
+    "ends_at": "2025-12-17",
+    "is_active": true,
+    "created_at": "...",
+    "updated_at": "..."
+  }
+}
+
+2. List all users subscribed to Pro
+
+GET /subscriptions/pro-users
+
+Description: Returns all users who currently have an active subscription to the "Pro" plan.
+
+Request:
+
+GET /api/subscriptions/pro-users
+Authorization: Bearer {token}
+
+
+Response:
+
+{
+  "plan": "Pro",
+  "count": 4,
+  "users": [
+    {"id": 1, "name": "Hassan", "email": "hassan@example.com"},
+    {"id": 7, "name": "Mona", "email": "mona@example.com"}
+  ]
+}
+
+3. List all plans
+
+GET /plans
+
+Description: Returns a list of all available subscription plans.
+
+Request:
+
+GET /api/plans
+Authorization: Bearer {token}
+
+
+Response:
+
+{
+  "count": 3,
+  "plans": [
+    {"id":1,"name":"Pro","duration":30,"price":29.99},
+    {"id":2,"name":"Basic","duration":30,"price":9.99},
+    {"id":3,"name":"Enterprise","duration":365,"price":299.99}
+  ]
+}
+
+4. Get a specific plan by ID
+
+GET /plan/{id}
+
+Description: Returns a specific plan's details.
+
+Request:
+
+GET /api/plan/1
+Authorization: Bearer {token}
+
+
+Response:
+
+{
+  "plan": {"id":1,"name":"Pro","duration":30,"price":29.99}
+}
+
+
+Error Response (if plan not found):
+
+{
+  "message": "Plan not found."
+}
+
+Notes
+
+Dates: starts_at and ends_at are in YYYY-MM-DD format.
+
+Active subscription: is_active = true indicates the user currently has access.
+
+Plan duration: duration is in days.
 
 ## Blogs
 
@@ -1886,7 +2006,8 @@ GET api/models
 | Blog Detail | GET | `/blogs/{id}` | ❌ |
 
 ---
-# Certificate API Documentation
+
+### [Certificate](#certificate)
 
 ## Base URL
 ```

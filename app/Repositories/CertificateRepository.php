@@ -54,13 +54,12 @@ class CertificateRepository
                 $attachmentPath = null;
                 
                 if (!empty($answerInput['attachment'])) {
-                    // File upload
+                    // File upload (multipart/form-data)
                     $file = $answerInput['attachment'];
                     $attachmentPath = $file->store("certificate_attachments/{$path}/{$organizationId}", 'public');
                 } elseif (!empty($answerInput['attachment_url'])) {
                     // Pre-uploaded file URL - extract path from URL
-                    $attachmentPath = str_replace(asset('storage/'), '', $answerInput['attachment_url']);
-                    $attachmentPath = str_replace(url('storage/'), '', $attachmentPath);
+                    $attachmentPath = $this->extractPathFromUrl($answerInput['attachment_url']);
                 }
 
                 // 💾 Upsert answer (update if exists, create if not)
@@ -91,6 +90,7 @@ class CertificateRepository
             return [
                 'saved_count' => $savedCount,
                 'total_questions' => $totalQuestions,
+                'answered_questions' => $answeredQuestions,
                 'is_complete' => $answeredQuestions >= $totalQuestions,
             ];
         });
@@ -123,7 +123,9 @@ class CertificateRepository
                 }
 
                 // 📎 Check attachment requirement
-                if ($question->attachment_required && empty($answerInput['attachment'])) {
+                if ($question->attachment_required && 
+                    empty($answerInput['attachment']) && 
+                    empty($answerInput['attachment_url'])) {
                     throw new \Exception("Attachment is required for question {$question->id}");
                 }
 
@@ -131,11 +133,13 @@ class CertificateRepository
                 $points = $this->calculatePoints($question, $selectedOption);
                 $finalPoints = $points * $question->weight;
 
-                // 📎 Handle file upload
+                // 📎 Handle file upload or URL
                 $attachmentPath = null;
                 if (!empty($answerInput['attachment'])) {
                     $file = $answerInput['attachment'];
                     $attachmentPath = $file->store("certificate_attachments/{$path}/{$organizationId}", 'public');
+                } elseif (!empty($answerInput['attachment_url'])) {
+                    $attachmentPath = $this->extractPathFromUrl($answerInput['attachment_url']);
                 }
 
                 // 💾 Store answer
@@ -154,7 +158,7 @@ class CertificateRepository
             // 🏆 Calculate rank
             $rank = $this->calculateRank($totalScore, $path);
             
-            // 📝 Update organization (this updates global score - you may want path-specific storage)
+            // 📝 Update organization
             $organization = Organization::findOrFail($organizationId);
             $organization->update([
                 'certificate_final_score' => $totalScore,
@@ -225,7 +229,7 @@ class CertificateRepository
                 })
                 ->delete();
             
-            // Recalculate overall score if needed (or set to null if no answers remain)
+            // Recalculate overall score if needed
             $remainingAnswers = $organization->certificateAnswers()->count();
             
             if ($remainingAnswers === 0) {
@@ -244,6 +248,26 @@ class CertificateRepository
                 ]);
             }
         });
+    }
+
+    /**
+     * 🔗 Extract storage path from full URL
+     */
+    private function extractPathFromUrl(string $url): string
+    {
+        // Remove base URL and /storage/ prefix
+        $path = str_replace(asset('storage/'), '', $url);
+        $path = str_replace(url('storage/'), '', $path);
+        
+        // Remove domain if present
+        $parsed = parse_url($url);
+        if (isset($parsed['path'])) {
+            $path = $parsed['path'];
+            // Remove /storage/ prefix
+            $path = preg_replace('#^/?storage/#', '', $path);
+        }
+        
+        return $path;
     }
 
     /**

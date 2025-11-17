@@ -80,4 +80,8 @@ public function isSubscribed()
 {
     return $this->subscription && $this->subscription->isValid();
 }
+public function subscriptionRequests()
+{
+    return $this->hasMany(\App\Models\SubscriptionRequest::class);
+}
 }

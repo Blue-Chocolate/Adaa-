@@ -51,8 +51,8 @@ Route::middleware('auth:sanctum')->group(function () {
 //         ->name('password.verify-token');
 
         
-Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
+// Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+// Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
 // Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 // Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
 
@@ -72,6 +72,7 @@ Route::apiResource('organizations', OrganizationController::class)->middleware('
 Route::prefix('podcasts')->group(function () {
     Route::get('/', [PodcastController::class, 'index']);
     Route::get('/{id}', [PodcastController::class, 'show']);
+    Route::get('/{id}/episodes', [PodcastController::class, 'episodes']);
 });
 
 /*
@@ -193,10 +194,32 @@ Route::prefix('news')->group(function () {
 use App\Http\Controllers\Api\SubscriptionController\SubscriptionController;
 Route::post('/subscribe/pro', [SubscriptionController::class, 'subscribeToPro'])
     ->middleware('auth:sanctum');
+Route::get('/subscriptions/pro', [\App\Http\Controllers\Api\SubscriptionController\SubscriptionController::class, 'getProUsers'])->middleware('auth:sanctum');
 
 use App\Http\Controllers\Api\ToolController\ToolController;
 Route::prefix('tools')->group(function () {
     Route::get('/', [ToolController::class, 'index']);
     Route::get('/{id}', [ToolController::class, 'show']);
     Route::get('/{id}/download', [ToolController::class, 'download']);
+});
+
+use App\Http\Controllers\Api\EpisodeController\EpisodeController;
+
+Route::get('/episodes', [EpisodeController::class, 'index']);
+Route::get('/episodes/{id}', [EpisodeController::class, 'show']);
+
+
+use App\Http\Controllers\Api\PlanController\PlanController;
+
+Route::get('/plans', [PlanController::class, 'index']);       // List all plans
+Route::get('/plan/{id}', [PlanController::class, 'show']);   // Get plan by ID
+
+
+use App\Http\Controllers\Api\SubscriptionRequestController\SubscriptionRequestController;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/subscription-requests', [SubscriptionRequestController::class, 'index']);
+    Route::get('/subscription-requests/{id}', [SubscriptionRequestController::class, 'show']);
+    Route::post('/subscription-requests', [SubscriptionRequestController::class, 'store']);
+    Route::post('/subscription-requests/{id}/approve', [SubscriptionRequestController::class, 'approve']);
 });

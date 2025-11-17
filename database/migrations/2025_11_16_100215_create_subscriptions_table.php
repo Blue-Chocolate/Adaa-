@@ -15,8 +15,8 @@ return new class extends Migration
         $table->id();
         $table->foreignId('user_id')->constrained()->onDelete('cascade');
         $table->foreignId('plan_id')->nullable()->constrained()->nullOnDelete();
-        $table->date('starts_at');
-        $table->date('ends_at');
+        $table->date('starts_at')->default(now());
+        $table->date('ends_at')->nullable();
         $table->boolean('is_active')->default(true);
         $table->timestamps();
     });

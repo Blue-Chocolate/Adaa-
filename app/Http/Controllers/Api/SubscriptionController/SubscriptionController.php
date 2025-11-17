@@ -31,4 +31,22 @@ class SubscriptionController extends Controller
             'subscription' => $subscription
         ]);
     }
+    public function getProUsers()
+{
+    // Get the Pro plan
+    $plan = Plan::where('name', 'Pro')->firstOrFail();
+
+    // Get users with an active Pro subscription
+    $users = Subscription::where('plan_id', $plan->id)
+        ->where('is_active', true)
+        ->with('user') // include user details
+        ->get()
+        ->pluck('user'); // return only user models
+
+    return response()->json([
+        'plan' => 'Pro',
+        'count' => $users->count(),
+        'users' => $users
+    ]);
+}
 }

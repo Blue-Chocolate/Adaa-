@@ -62,7 +62,6 @@ class EmailVerificationService
             $user->email_verification_sent_at = now();
             $user->save();
 
-<<<<<<< HEAD
             // Generate verification URL
 
             // Generate verification URL (no /auth prefix)

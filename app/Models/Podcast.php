@@ -9,4 +9,9 @@ class Podcast extends Model
 {
     use SoftDeletes;
     protected $fillable = ['title', 'description','short_description', 'cover_image','audio_path', 'video_path'];
+    public function episodes()
+{
+    return $this->hasMany(Episode::class);
+}
+
 }

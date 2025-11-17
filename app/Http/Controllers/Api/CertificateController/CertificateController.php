@@ -83,6 +83,7 @@ class CertificateController extends Controller
                 'data' => [
                     'path' => $path,
                     'saved_count' => $result['saved_count'],
+                    'answered_questions' => $result['answered_questions'],
                     'total_questions' => $result['total_questions'],
                     'is_complete' => $result['is_complete'],
                 ]
@@ -133,7 +134,7 @@ class CertificateController extends Controller
         }
 
         // Validate request
-        $validator = $this->buildValidator($request, $path);
+        $validator = $this->buildValidator($request, $path, true); // true = complete validation
         
         if ($validator->fails()) {
             return response()->json([
@@ -168,7 +169,7 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➌ Show certificate details with all answers for specific path
+     * ➍ Show certificate details with all answers for specific path
      */
     public function show(Request $request, string $path)
     {
@@ -199,8 +200,11 @@ class CertificateController extends Controller
             }
         ]);
 
-        // Get path-specific data (if you want to store per-path scores)
+        // Get path-specific data
         $pathAnswers = $organization->certificateAnswers;
+
+        // Calculate path-specific score
+        $pathScore = $pathAnswers->sum('final_points');
 
         return response()->json([
             'success' => true,
@@ -210,16 +214,18 @@ class CertificateController extends Controller
                     'name' => $organization->name,
                 ],
                 'path' => $path,
-                'certificate_score' => $organization->certificate_final_score,
-                'certificate_rank' => $organization->certificate_final_rank,
+                'path_score' => $pathScore,
+                'overall_certificate_score' => $organization->certificate_final_score,
+                'overall_certificate_rank' => $organization->certificate_final_rank,
                 'answers' => $pathAnswers,
-                'total_questions' => $pathAnswers->count(),
+                'answered_questions' => $pathAnswers->count(),
+                'total_questions' => \App\Models\CertificateQuestion::where('path', $path)->count(),
             ]
         ]);
     }
 
     /**
-     * ➍ Update answers for specific path
+     * ➎ Update answers for specific path
      */
     public function updateAnswers(Request $request, string $path)
     {
@@ -239,7 +245,7 @@ class CertificateController extends Controller
             ], 404);
         }
 
-        $validator = $this->buildValidator($request, $path);
+        $validator = $this->buildValidator($request, $path, true);
         
         if ($validator->fails()) {
             return response()->json([
@@ -273,7 +279,7 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➎ Delete certificate answers for specific path
+     * ➏ Delete certificate answers for specific path
      */
     public function destroy(Request $request, string $path)
     {
@@ -309,7 +315,7 @@ class CertificateController extends Controller
     }
 
     /**
-     * ➏ Get all paths summary for organization
+     * ➐ Get all paths summary for organization
      */
     public function summary(Request $request)
     {
@@ -325,7 +331,7 @@ class CertificateController extends Controller
         $summary = [];
 
         foreach (self::VALID_PATHS as $path) {
-            $answersCount = $organization->certificateAnswers()
+            $answeredQuestions = $organization->certificateAnswers()
                 ->whereHas('question', function($query) use ($path) {
                     $query->where('path', $path);
                 })
@@ -333,10 +339,17 @@ class CertificateController extends Controller
 
             $totalQuestions = \App\Models\CertificateQuestion::where('path', $path)->count();
 
+            $pathScore = $organization->certificateAnswers()
+                ->whereHas('question', function($query) use ($path) {
+                    $query->where('path', $path);
+                })
+                ->sum('final_points');
+
             $summary[$path] = [
-                'answered' => $answersCount,
+                'answered' => $answeredQuestions,
                 'total' => $totalQuestions,
-                'completed' => $answersCount >= $totalQuestions,
+                'completed' => $answeredQuestions >= $totalQuestions,
+                'score' => $pathScore,
             ];
         }
 
@@ -357,9 +370,9 @@ class CertificateController extends Controller
     /**
      * 🎯 Build validator for answers submission
      */
-    private function buildValidator(Request $request, string $path)
+    private function buildValidator(Request $request, string $path, bool $requireComplete = true)
     {
-        return Validator::make($request->all(), [
+        $rules = [
             'answers' => 'required|array|min:1',
             'answers.*.question_id' => [
                 'required',
@@ -374,7 +387,24 @@ class CertificateController extends Controller
             ],
             'answers.*.selected_option' => 'required|string',
             'answers.*.attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
-        ]);
+            'answers.*.attachment_url' => 'nullable|string|url',
+        ];
+
+        // If complete submission, validate all questions are answered
+        if ($requireComplete) {
+            $rules['answers'] = [
+                'required',
+                'array',
+                function ($attribute, $value, $fail) use ($path) {
+                    $totalQuestions = \App\Models\CertificateQuestion::where('path', $path)->count();
+                    if (count($value) < $totalQuestions) {
+                        $fail("All questions must be answered. Expected {$totalQuestions}, got " . count($value));
+                    }
+                },
+            ];
+        }
+
+        return Validator::make($request->all(), $rules);
     }
 
     /**

@@ -65,8 +65,18 @@ class PodcastController extends Controller
         ]);
     }
 
-    /**
-     * POST /api/podcasts
-     */
-    
+
+    public function episodes($id)
+{
+    $podcast = Podcast::with('episodes')->findOrFail($id);
+
+    return response()->json([
+        'success' => true,
+        'podcast' => [
+            'id' => $podcast->id,
+            'title' => $podcast->title,
+            'episodes' => $podcast->episodes
+        ]
+    ]);
+}
 }
