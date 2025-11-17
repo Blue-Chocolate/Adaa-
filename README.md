@@ -2014,114 +2014,51 @@ GET api/models
 /api/certificates
 ```
 
-## Authentication
-All endpoints require authentication using Sanctum token:
+All endpoints require Bearer token:
 ```
-Authorization: Bearer {your-token}
+Authorization: Bearer {your_sanctum_token}
 ```
 
 ---
 
-## 📋 1. Get Summary of All Paths
+## 👤 User/Organization APIs
 
-**Endpoint:** `GET /api/certificates/summary`
+### ➊ Get Questions by Path
 
-**Description:** Get completion status for all certificate paths (strategic, operational, hr)
+Get all questions for a specific certification path.
 
 **Request:**
-```bash
-curl -X GET http://your-domain.com/api/certificates/summary \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
+```http
+GET /api/certificates/{path}/questions
 ```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "organization": {
-      "id": 1,
-      "name": "جمعية الخير"
-    },
-    "overall_score": 145.5,
-    "overall_rank": "gold",
-    "paths": {
-      "strategic": {
-        "answered": 5,
-        "total": 5,
-        "completed": true
-      },
-      "operational": {
-        "answered": 0,
-        "total": 3,
-        "completed": false
-      },
-      "hr": {
-        "answered": 7,
-        "total": 7,
-        "completed": true
-      }
-    }
-  }
-}
-```
-
----
-
-## 📝 2. Get Questions by Path
-
-**Endpoint:** `GET /api/certificates/questions/{path}`
 
 **Path Parameters:**
-- `path`: `strategic` | `operational` | `hr`
+- `path`: `strategic`, `operational`, or `hr`
 
-### 2.1 Strategic Questions
-
-**Request:**
-```bash
-curl -X GET http://your-domain.com/api/certificates/questions/strategic \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
-```
-
-**Response:**
+**Success Response (200):**
 ```json
 {
   "success": true,
   "data": [
     {
       "id": 1,
-      "name": "المسار الاستراتيجي",
-      "description": "محور خاص بالمسار الاستراتيجي",
+      "name": "Strategic Planning Axis",
+      "description": "Questions about strategic planning",
       "path": "strategic",
-      "weight": 1.0,
+      "weight": 1.5,
       "questions": [
         {
           "id": 1,
-          "question_text": "ما هو موعد نشر التقرير السنوي للجمعية لهذا العام؟",
-          "options": [
-            "قبل شهر 3",
-            "بعد شهر 3",
-            "بعد شهر 5",
-            "بعد شهر 6",
-            "بعد شهر 7",
-            "بعد شهر 8",
-            "بعد شهر 9",
-            "بعد شهر 10"
-          ],
+          "question_text": "Does your organization have a clear strategic plan?",
+          "options": ["Yes, documented", "Yes, verbal", "No"],
           "points_mapping": {
-            "قبل شهر 3": 15,
-            "بعد شهر 3": 10,
-            "بعد شهر 5": 8,
-            "بعد شهر 6": 6,
-            "بعد شهر 7": 5,
-            "بعد شهر 8": 4,
-            "بعد شهر 9": 3,
-            "بعد شهر 10": 2
+            "Yes, documented": 10,
+            "Yes, verbal": 5,
+            "No": 0
           },
+          "weight": 2,
           "attachment_required": true,
-          "weight": 1.0
+          "path": "strategic"
         }
       ]
     }
@@ -2129,684 +2066,580 @@ curl -X GET http://your-domain.com/api/certificates/questions/strategic \
 }
 ```
 
-### 2.2 Operational Questions
-
-**Request:**
-```bash
-curl -X GET http://your-domain.com/api/certificates/questions/operational \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
-```
-
-### 2.3 HR Questions
-
-**Request:**
-```bash
-curl -X GET http://your-domain.com/api/certificates/questions/hr \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
-```
-
 ---
 
-## 📤 3. Upload Attachment
+### ➋ Save Answers
 
-**Endpoint:** `POST /api/certificates/upload/{path}`
-
-**Path Parameters:**
-- `path`: `strategic` | `operational` | `hr`
-
-**Description:** Upload an attachment file and get its URL to use later when saving/submitting answers
-
-**Content-Type:** `multipart/form-data`
-
-### 3.1 Upload File for Strategic Path
+Save one or multiple answers. Files can be uploaded directly or URLs provided.
 
 **Request:**
-```bash
-curl -X POST http://your-domain.com/api/certificates/upload/strategic \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
-  -F "file=@/path/to/document.pdf" \
-  -F "question_id=1"
+```http
+POST /api/certificates/{path}/answers
+Content-Type: multipart/form-data OR application/json
 ```
 
-**Request Body:**
-- `file`: File to upload (required)
-- `question_id`: ID of the question this attachment is for (required)
-
-**Success Response:**
+**Request Body (with file upload):**
 ```json
 {
-  "success": true,
-  "message": "تم رفع الملف بنجاح ✅",
-  "data": {
-    "path": "certificate_attachments/strategic/1/xyz789.pdf",
-    "url": "http://your-domain.com/storage/certificate_attachments/strategic/1/xyz789.pdf",
-    "question_id": 1
-  }
+  "answers": [
+    {
+      "question_id": 1,
+      "selected_option": "Yes, documented",
+      "attachment": "[FILE UPLOAD]"
+    },
+    {
+      "question_id": 2,
+      "selected_option": "Option B"
+    }
+  ]
 }
 ```
 
-**Use the returned URL when saving/submitting answers!**
-
----
-
-## 💾 4. Save Answers (Incremental)
-
-**Endpoint:** `POST /api/certificates/save/{path}`
-
-**Path Parameters:**
-- `path`: `strategic` | `operational` | `hr`
-
-**Description:** Save answers incrementally. You don't need to submit all answers at once. Can be called multiple times to add/update answers.
-
-**Content-Type:** `application/json`
-
-### 4.1 Save Some Strategic Answers
-
-**Request:**
-```bash
-curl -X POST http://your-domain.com/api/certificates/save/strategic \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "answers": [
-      {
-        "question_id": 1,
-        "selected_option": "قبل شهر 3",
-        "attachment_url": "http://your-domain.com/storage/certificate_attachments/strategic/1/abc123.pdf"
-      },
-      {
-        "question_id": 2,
-        "selected_option": "من 86 - 100",
-        "attachment_url": "http://your-domain.com/storage/certificate_attachments/strategic/1/xyz456.pdf"
-      }
-    ]
-  }'
-```
-
-**Success Response:**
+**Request Body (with URL):**
 ```json
 {
-  "success": true,
-  "message": "تم حفظ الإجابات بنجاح ✅",
-  "data": {
-    "path": "strategic",
-    "saved_count": 2,
-    "total_questions": 5,
-    "is_complete": false
-  }
+  "answers": [
+    {
+      "question_id": 1,
+      "selected_option": "Yes, documented",
+      "attachment_url": "https://yourdomain.com/storage/certificate_attachments/strategic/1/doc.pdf"
+    }
+  ]
 }
 ```
 
-### 4.2 Save More Answers Later
-
-**Request:**
-```bash
-curl -X POST /api/certificates/{path}/save \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "answers": [
-      {
-        "question_id": 3,
-        "selected_option": "من 86 - 100%",
-        "attachment_url": "http://your-domain.com/storage/certificate_attachments/strategic/1/def789.pdf"
-      }
-    ]
-  }'
-```
-
-**Response:**
+**Success Response (200):**
 ```json
 {
   "success": true,
-  "message": "تم حفظ الإجابات بنجاح ✅",
+  "message": "تم حفظ الإجابات بنجاح ✅ (تم تجاهل 2 إجابات محفوظة مسبقاً)",
   "data": {
     "path": "strategic",
-    "saved_count": 1,
-    "total_questions": 5,
+    "saved_count": 3,
+    "skipped_count": 2,
+    "answered_questions": 8,
+    "total_questions": 10,
     "is_complete": false
   }
 }
 ```
 
 **Notes:**
-- You can save any number of answers (1 or more)
-- Already answered questions will be updated
-- No score/rank calculation until final submission
-- Use `attachment_url` field with the URL from upload endpoint
+- ✅ Answers can be saved one-by-one or in bulk
+- 🔒 Once saved, answers **cannot be modified**
+- ⏭️ Attempting to re-save skips the answer (no error)
+- 📎 Either upload file OR provide URL (not both)
 
 ---
 
-## ✅ 5. Submit Answers (Final)
+### ➌ Submit Certificate Path
 
-**Endpoint:** `POST /api/certificates/answers/{path}`
-
-**Path Parameters:**
-- `path`: `strategic` | `operational` | `hr`
-
-**Content-Type:** `multipart/form-data` (when uploading files)
-
-### 3.1 Submit Strategic Answers
+Submit a completed path to calculate the score.
 
 **Request:**
-```bash
-curl -X POST http://your-domain.com/api/certificates/answers/strategic \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
-  -F "answers[0][question_id]=1" \
-  -F "answers[0][selected_option]=قبل شهر 3" \
-  -F "answers[0][attachment]=@/path/to/annual_report.pdf" \
-  -F "answers[1][question_id]=2" \
-  -F "answers[1][selected_option]=من 86 - 100" \
-  -F "answers[1][attachment]=@/path/to/governance_report.pdf" \
-  -F "answers[2][question_id]=3" \
-  -F "answers[2][selected_option]=من 86 - 100%" \
-  -F "answers[2][attachment]=@/path/to/performance_report.pdf" \
-  -F "answers[3][question_id]=4" \
-  -F "answers[3][selected_option]=تم النشر" \
-  -F "answers[3][attachment]=@/path/to/sustainability_report.pdf" \
-  -F "answers[4][question_id]=5" \
-  -F "answers[4][selected_option]=تم النشر" \
-  -F "answers[4][attachment]=@/path/to/impact_report.pdf"
+```http
+POST /api/certificates/{path}/submit
 ```
 
-**JSON Body (if no files):**
+**Success Response - Path Completed (200):**
+```json
+{
+  "success": true,
+  "message": "تم إرسال مسار strategic بنجاح ✅",
+  "data": {
+    "path": "strategic",
+    "path_score": 85.5,
+    "all_paths_completed": false,
+    "completed_paths": 1,
+    "total_paths": 3,
+    "overall_score": null,
+    "overall_rank": null
+  }
+}
+```
+
+**Success Response - All Paths Completed (200):**
+```json
+{
+  "success": true,
+  "message": "تم إرسال مسار hr بنجاح! 🎉 جميع المسارات مكتملة ✅",
+  "data": {
+    "path": "hr",
+    "path_score": 92.0,
+    "all_paths_completed": true,
+    "completed_paths": 3,
+    "total_paths": 3,
+    "overall_score": 265.5,
+    "overall_rank": "gold"
+  }
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "success": false,
+  "message": "Cannot submit. You have answered 5 out of 10 questions."
+}
+```
+
+**Ranking System:**
+- 💎 **Diamond**: ≥86%
+- 🥇 **Gold**: ≥76%
+- 🥈 **Silver**: ≥66%
+- 🥉 **Bronze**: ≥55%
+
+---
+
+### ➏ Bulk Upload Answers
+
+Upload multiple answers at once using attachment URLs (no file uploads).
+
+**Request:**
+```http
+POST /api/certificates/{path}/upload-answers
+Content-Type: application/json
+```
+
+**Request Body:**
 ```json
 {
   "answers": [
     {
       "question_id": 1,
-      "selected_option": "قبل شهر 3"
+      "selected_option": "Option A",
+      "attachment_url": "https://yourdomain.com/storage/file1.pdf"
     },
     {
       "question_id": 2,
-      "selected_option": "من 86 - 100"
+      "selected_option": "Option B",
+      "attachment_url": "https://yourdomain.com/storage/file2.pdf"
     },
     {
       "question_id": 3,
-      "selected_option": "من 86 - 100%"
-    },
-    {
-      "question_id": 4,
-      "selected_option": "تم النشر"
-    },
-    {
-      "question_id": 5,
-      "selected_option": "تم النشر"
+      "selected_option": "Option C"
     }
   ]
 }
 ```
 
-**Success Response:**
+**Success Response (200):**
 ```json
 {
   "success": true,
-  "message": "تم إرسال الإجابات والملفات بنجاح ✅",
+  "message": "تم رفع الإجابات بنجاح ✅ (تم تجاهل 2 إجابات محفوظة مسبقاً)",
   "data": {
     "path": "strategic",
-    "final_score": 145,
-    "final_rank": "diamond"
+    "saved_count": 8,
+    "skipped_count": 2,
+    "answered_questions": 10,
+    "total_questions": 10,
+    "is_complete": true,
+    "errors": []
   }
 }
 ```
 
-**Error Response (Already Submitted):**
-```json
-{
-  "success": false,
-  "message": "Answers already submitted for this path. Use update endpoint instead."
-}
-```
-
-**Validation Error:**
-```json
-{
-  "success": false,
-  "errors": {
-    "answers.0.attachment": [
-      "Attachment is required for question 1"
-    ],
-    "answers.1.selected_option": [
-      "The selected option field is required."
-    ]
-  }
-}
-```
-
-### 3.2 Submit Operational Answers
-
-**Request:**
-```bash
-curl -X POST http://your-domain.com/api/certificates/answers/operational \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "answers": [
-      {
-        "question_id": 6,
-        "selected_option": "قبل شهر 3"
-      },
-      {
-        "question_id": 7,
-        "selected_option": "من 86 - 100"
-      },
-      {
-        "question_id": 8,
-        "selected_option": "من 90 - 100%"
-      }
-    ]
-  }'
-```
-
-**Success Response:**
-```json
-{
-  "success": true,
-  "message": "تم إرسال الإجابات والملفات بنجاح ✅",
-  "data": {
-    "path": "operational",
-    "final_score": 130,
-    "final_rank": "gold"
-  }
-}
-```
-
-### 3.3 Submit HR Answers
-
-**Request:**
-```bash
-curl -X POST http://your-domain.com/api/certificates/answers/hr \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
-  -F "answers[0][question_id]=9" \
-  -F "answers[0][selected_option]=موجود ومُوثق بالكامل مطبق" \
-  -F "answers[0][attachment]=@/path/to/org_structure.pdf" \
-  -F "answers[1][question_id]=10" \
-  -F "answers[1][selected_option]=نعم" \
-  -F "answers[2][question_id]=11" \
-  -F "answers[2][selected_option]=موجودة ومنفذة" \
-  -F "answers[2][attachment]=@/path/to/training_plan.pdf" \
-  -F "answers[3][question_id]=12" \
-  -F "answers[3][selected_option]=نعم دوريًا" \
-  -F "answers[4][question_id]=13" \
-  -F "answers[4][selected_option]=موجود ومنصف" \
-  -F "answers[4][attachment]=@/path/to/incentives_policy.pdf" \
-  -F "answers[5][question_id]=14" \
-  -F "answers[5][selected_option]=موجود ونشط" \
-  -F "answers[6][question_id]=15" \
-  -F "answers[6][selected_option]=نعم" \
-  -F "answers[6][attachment]=@/path/to/communication_system.pdf"
-```
+**Use Case:** Importing answers from external systems or Excel sheets.
 
 ---
 
-## 👁️ 4. View Answers by Path
+### ➐ Download Path Data
 
-**Endpoint:** `GET /api/certificates/answers/{path}`
-
-**Path Parameters:**
-- `path`: `strategic` | `operational` | `hr`
-
-### 4.1 View Strategic Answers
+Get detailed certificate data for a specific path.
 
 **Request:**
-```bash
-curl -X GET http://your-domain.com/api/certificates/answers/strategic \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
+```http
+GET /api/certificates/{path}/download
 ```
 
-**Response:**
+**Success Response (200):**
 ```json
 {
   "success": true,
   "data": {
     "organization": {
       "id": 1,
-      "name": "جمعية الخير"
+      "name": "ABC Company",
+      "email": "contact@abc.com"
     },
     "path": "strategic",
-    "certificate_score": 145,
-    "certificate_rank": "diamond",
-    "total_questions": 5,
-    "answers": [
+    "path_score": 85.5,
+    "axes": [
+      {
+        "axis_id": 1,
+        "axis_name": "Strategic Planning",
+        "axis_description": "Strategic planning questions",
+        "axis_weight": 1.5,
+        "questions": [
+          {
+            "question_id": 1,
+            "question_text": "Question text?",
+            "options": ["Option 1", "Option 2", "Option 3"],
+            "selected_option": "Option 1",
+            "points": 10,
+            "final_points": 20,
+            "weight": 2,
+            "attachment_path": "https://domain.com/storage/file.pdf",
+            "attachment_required": true,
+            "answered": true
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "answered_questions": 10,
+      "total_questions": 10,
+      "completion_percentage": 100,
+      "is_complete": true
+    }
+  }
+}
+```
+
+---
+
+### ➑ Download Overall Data
+
+Get complete certificate data for all paths.
+
+**Request:**
+```http
+GET /api/certificates/download
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "organization": {
+      "id": 1,
+      "name": "ABC Company",
+      "email": "contact@abc.com",
+      "phone": "+1234567890"
+    },
+    "overall_score": 265.5,
+    "overall_rank": "gold",
+    "completed_paths": 3,
+    "total_paths": 3,
+    "all_paths_completed": true,
+    "paths_data": {
+      "strategic": {
+        "organization": {...},
+        "path": "strategic",
+        "path_score": 85.5,
+        "axes": [...]
+      },
+      "operational": {...},
+      "hr": {...}
+    }
+  }
+}
+```
+
+---
+
+### ➒ Get User Summary
+
+Get certificate progress summary with completion rates and states.
+
+**Request:**
+```http
+GET /api/certificates/summary
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "organization": {
+      "id": 1,
+      "name": "ABC Company",
+      "email": "contact@abc.com"
+    },
+    "overall_completion_rate": 66.67,
+    "overall_score": 245.5,
+    "overall_rank": "gold",
+    "paths": {
+      "strategic": {
+        "path_name": "strategic",
+        "state": "complete",
+        "completion_rate": 100,
+        "answered_questions": 10,
+        "total_questions": 10,
+        "current_score": 85.5,
+        "max_possible_score": 100
+      },
+      "operational": {
+        "path_name": "operational",
+        "state": "in_review",
+        "completion_rate": 60,
+        "answered_questions": 6,
+        "total_questions": 10,
+        "current_score": 45.0,
+        "max_possible_score": 100
+      },
+      "hr": {
+        "path_name": "hr",
+        "state": "not_started",
+        "completion_rate": 0,
+        "answered_questions": 0,
+        "total_questions": 10,
+        "current_score": 0,
+        "max_possible_score": 100
+      }
+    },
+    "progress_summary": {
+      "not_started": 1,
+      "in_review": 1,
+      "complete": 1,
+      "total_paths": 3
+    }
+  }
+}
+```
+
+**Path States:**
+- 🆕 **not_started**: 0% completion
+- 📝 **in_review**: 1-99% completion
+- ✅ **complete**: 100% completion
+
+---
+
+### ➓ Upload File Only
+
+Upload a file and receive its URL without saving an answer.
+
+**Request:**
+```http
+POST /api/certificates/{path}/upload-file
+Content-Type: multipart/form-data
+```
+
+**Form Data:**
+```
+file: [YOUR FILE]
+```
+
+**Allowed Types:** `pdf`, `doc`, `docx`, `jpg`, `jpeg`, `png`  
+**Max Size:** 5MB (5120KB)
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "تم رفع الملف بنجاح ✅",
+  "data": {
+    "attachment_path": "certificate_attachments/strategic/123/document.pdf",
+    "attachment_url": "https://yourdomain.com/storage/certificate_attachments/strategic/123/document.pdf"
+  }
+}
+```
+
+**Usage Workflow:**
+1. Upload file → receive `attachment_url`
+2. Save answer with `attachment_url`
+
+---
+
+## 👨‍💼 Admin APIs
+
+### ➍ Get Analytics
+
+Get comprehensive analytics about all organizations.
+
+**Request:**
+```http
+GET /api/admin/certificates/analytics
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "total_organizations": 50,
+    "completed_all_paths": 15,
+    "partial_completion": 25,
+    "not_started": 10,
+    "organizations": {
+      "completed_all": [
+        {
+          "id": 1,
+          "name": "Company A",
+          "email": "companya@example.com",
+          "paths": {
+            "strategic": {
+              "answered": 10,
+              "total": 10,
+              "completed": true,
+              "score": 85.5,
+              "percentage": 100
+            },
+            "operational": {
+              "answered": 10,
+              "total": 10,
+              "completed": true,
+              "score": 90.0,
+              "percentage": 100
+            },
+            "hr": {
+              "answered": 10,
+              "total": 10,
+              "completed": true,
+              "score": 90.0,
+              "percentage": 100
+            }
+          },
+          "overall_score": 265.5,
+          "overall_rank": "gold",
+          "completed_paths": 3,
+          "total_paths": 3
+        }
+      ],
+      "partial_completion": [...],
+      "not_started": [...]
+    }
+  }
+}
+```
+
+---
+
+### ➎ Get All Organizations
+
+Get list of all registered organizations with progress.
+
+**Request:**
+```http
+GET /api/admin/certificates/organizations
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "total": 50,
+    "organizations": [
       {
         "id": 1,
-        "organization_id": 1,
-        "certificate_question_id": 1,
-        "selected_option": "قبل شهر 3",
-        "points": 15,
-        "final_points": 15,
-        "attachment_path": "certificate_attachments/strategic/1/abc123.pdf",
-        "created_at": "2024-11-15T10:30:00.000000Z",
-        "question": {
-          "id": 1,
-          "question_text": "ما هو موعد نشر التقرير السنوي للجمعية لهذا العام؟",
-          "options": ["قبل شهر 3", "بعد شهر 3"],
-          "attachment_required": true,
-          "axis": {
-            "id": 1,
-            "name": "المسار الاستراتيجي"
+        "name": "Company Name",
+        "email": "company@example.com",
+        "phone": "+1234567890",
+        "created_at": "2024-01-15T10:30:00.000000Z",
+        "paths": {
+          "strategic": {
+            "answered": 10,
+            "total": 10,
+            "completed": true,
+            "score": 85.5,
+            "percentage": 100
+          },
+          "operational": {
+            "answered": 7,
+            "total": 10,
+            "completed": false,
+            "score": 45.0,
+            "percentage": 70
+          },
+          "hr": {
+            "answered": 0,
+            "total": 10,
+            "completed": false,
+            "score": 0,
+            "percentage": 0
           }
-        }
+        },
+        "overall_score": 265.5,
+        "overall_rank": "gold"
       }
     ]
   }
 }
 ```
 
-### 4.2 View Operational Answers
-
-**Request:**
-```bash
-curl -X GET http://your-domain.com/api/certificates/answers/operational \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
-```
-
-### 4.3 View HR Answers
-
-**Request:**
-```bash
-curl -X GET http://your-domain.com/api/certificates/answers/hr \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
-```
-
 ---
 
-## 🔄 5. Update Answers
+## 🎯 Complete Usage Example
 
-**Endpoint:** `PUT /api/certificates/answers/{path}`
+### Scenario: Organization Completing Certificate
 
-**Path Parameters:**
-- `path`: `strategic` | `operational` | `hr`
-
-**Note:** This will DELETE all previous answers for this path and replace them.
-
-### 5.1 Update Strategic Answers
-
-**Request:**
 ```bash
-curl -X PUT http://your-domain.com/api/certificates/answers/strategic \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
+# Step 1: Upload attachments first (optional)
+curl -X POST "https://api.example.com/api/certificates/strategic/upload-file" \
+  -H "Authorization: Bearer TOKEN" \
+  -F "file=@strategic-plan.pdf"
+
+# Response: { "attachment_url": "https://..." }
+
+# Step 2: Get questions
+curl -X GET "https://api.example.com/api/certificates/strategic/questions" \
+  -H "Authorization: Bearer TOKEN"
+
+# Step 3: Save answers (batch)
+curl -X POST "https://api.example.com/api/certificates/strategic/answers" \
+  -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "answers": [
       {
         "question_id": 1,
-        "selected_option": "بعد شهر 3"
+        "selected_option": "Yes, documented",
+        "attachment_url": "https://api.example.com/storage/..."
       },
       {
         "question_id": 2,
-        "selected_option": "من 76 - 85"
+        "selected_option": "Monthly"
       },
       {
         "question_id": 3,
-        "selected_option": "من 76 - 85%"
-      },
-      {
-        "question_id": 4,
-        "selected_option": "جاري الإعداد"
-      },
-      {
-        "question_id": 5,
-        "selected_option": "تم الانتهاء ولم يُنشر"
+        "selected_option": "Board approved"
       }
     ]
   }'
-```
 
-**Success Response:**
-```json
-{
-  "success": true,
-  "message": "تم تحديث الإجابات بنجاح ✅",
-  "data": {
-    "path": "strategic",
-    "final_score": 98,
-    "final_rank": "gold"
-  }
-}
-```
+# Step 4: Check progress
+curl -X GET "https://api.example.com/api/certificates/summary" \
+  -H "Authorization: Bearer TOKEN"
 
-### 5.2 Update Operational Answers
+# Step 5: Submit when complete
+curl -X POST "https://api.example.com/api/certificates/strategic/submit" \
+  -H "Authorization: Bearer TOKEN"
 
-**Request:**
-```bash
-curl -X PUT http://your-domain.com/api/certificates/answers/operational \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "answers": [
-      {
-        "question_id": 6,
-        "selected_option": "بعد شهر 5"
-      },
-      {
-        "question_id": 7,
-        "selected_option": "من 76 - 85"
-      },
-      {
-        "question_id": 8,
-        "selected_option": "من 76 - 89%"
-      }
-    ]
-  }'
-```
+# Step 6: Repeat for operational and hr paths
 
-### 5.3 Update HR Answers
-
-**Request:**
-```bash
-curl -X PUT http://your-domain.com/api/certificates/answers/hr \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json" \
-  -F "answers[0][question_id]=9" \
-  -F "answers[0][selected_option]=جزئيًا مطبق" \
-  -F "answers[0][attachment]=@/path/to/updated_structure.pdf"
-  # ... include all 7 HR questions
+# Step 7: Download final certificate
+curl -X GET "https://api.example.com/api/certificates/download" \
+  -H "Authorization: Bearer TOKEN"
 ```
 
 ---
 
-## 🗑️ 6. Delete Answers by Path
+## 📝 Key Features Summary
 
-**Endpoint:** `DELETE /api/certificates/answers/{path}`
-
-**Path Parameters:**
-- `path`: `strategic` | `operational` | `hr`
-
-**Description:** Deletes all answers and uploaded files for the specified path only.
-
-### 6.1 Delete Strategic Answers
-
-**Request:**
-```bash
-curl -X DELETE http://your-domain.com/api/certificates/answers/strategic \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
-```
-
-**Success Response:**
-```json
-{
-  "success": true,
-  "message": "تم الحذف بنجاح ✅"
-}
-```
-
-### 6.2 Delete Operational Answers
-
-**Request:**
-```bash
-curl -X DELETE http://your-domain.com/api/certificates/answers/operational \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
-```
-
-### 6.3 Delete HR Answers
-
-**Request:**
-```bash
-curl -X DELETE http://your-domain.com/api/certificates/answers/hr \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Accept: application/json"
-```
+| Feature | Endpoint | Method |
+|---------|----------|--------|
+| Get Questions | `/certificates/{path}/questions` | GET |
+| Save Answers | `/certificates/{path}/answers` | POST |
+| Submit Path | `/certificates/{path}/submit` | POST |
+| Bulk Upload | `/certificates/{path}/upload-answers` | POST |
+| Upload File | `/certificates/{path}/upload-file` | POST |
+| Path Data | `/certificates/{path}/download` | GET |
+| Overall Data | `/certificates/download` | GET |
+| Summary | `/certificates/summary` | GET |
+| Analytics (Admin) | `/admin/certificates/analytics` | GET |
+| All Orgs (Admin) | `/admin/certificates/organizations` | GET |
 
 ---
 
-## 📊 Ranking System
+## ⚠️ Important Rules
 
-Based on normalized score (0-100%):
-
-| Rank | Score Range |
-|------|-------------|
-| Diamond 💎 | 86% - 100% |
-| Gold 🥇 | 76% - 85% |
-| Silver 🥈 | 66% - 75% |
-| Bronze 🥉 | 55% - 65% |
-
----
-
-## ⚠️ Error Codes
-
-| Status Code | Description |
-|-------------|-------------|
-| 200 | Success |
-| 400 | Bad Request (Invalid path or data) |
-| 404 | Organization not found |
-| 409 | Conflict (Answers already submitted) |
-| 422 | Validation Error |
-| 500 | Server Error |
-
----
-
-## 🧪 Postman Collection
-
-Import this collection to test all endpoints:
-
-```json
-{
-  "info": {
-    "name": "Certificate API",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      {
-        "key": "token",
-        "value": "{{token}}",
-        "type": "string"
-      }
-    ]
-  },
-  "item": [
-    {
-      "name": "Get Summary",
-      "request": {
-        "method": "GET",
-        "url": "{{base_url}}/api/certificates/summary"
-      }
-    },
-    {
-      "name": "Get Strategic Questions",
-      "request": {
-        "method": "GET",
-        "url": "{{base_url}}/api/certificates/questions/strategic"
-      }
-    },
-    {
-      "name": "Submit Strategic Answers",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/api/certificates/answers/strategic",
-        "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "answers[0][question_id]",
-              "value": "1",
-              "type": "text"
-            },
-            {
-              "key": "answers[0][selected_option]",
-              "value": "قبل شهر 3",
-              "type": "text"
-            },
-            {
-              "key": "answers[0][attachment]",
-              "type": "file",
-              "src": ""
-            }
-          ]
-        }
-      }
-    }
-  ]
-}
-```
-
----
-
-## 📝 Testing Workflow
-
-### Step 1: Get Strategic Questions
-```bash
-GET /api/certificates/questions/strategic
-```
-
-### Step 2: Submit Strategic Answers
-```bash
-POST /api/certificates/answers/strategic
-# Include all 5 strategic answers
-```
-
-### Step 3: View Submitted Answers
-```bash
-GET /api/certificates/answers/strategic
-```
-
-### Step 4: Get Summary
-```bash
-GET /api/certificates/summary
-# Should show strategic completed
-```
-
-### Step 5: Get Operational Questions
-```bash
-GET /api/certificates/questions/operational
-```
-
-### Step 6: Submit Operational Answers
-```bash
-POST /api/certificates/answers/operational
-# Include all 3 operational answers
-```
-
-### Step 7: Get HR Questions
-```bash
-GET /api/certificates/questions/hr
-```
-
-### Step 8: Submit HR Answers
-```bash
-POST /api/certificates/answers/hr
-# Include all 7 HR answers
-```
-
-### Step 9: Final Summary
-```bash
-GET /api/certificates/summary
-# Should show all paths completed
-```
+1. **Immutability**: Answers cannot be modified after saving
+2. **Sequential**: Must answer all questions before submitting
+3. **Final Rank**: Only calculated when all 3 paths are complete
+4. **File Size**: Maximum 5MB per attachment
+5. **File Types**: pdf, doc, docx, jpg, jpeg, png only
+6. **Paths**: Must be `strategic`, `operational`, or `hr`
