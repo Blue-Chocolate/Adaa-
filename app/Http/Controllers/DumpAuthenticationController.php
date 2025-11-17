@@ -150,71 +150,90 @@ class DumpAuthenticationController extends Controller
     /**
      * Return current authenticated user with fresh data
      */
-    public function me(Request $request)
-    {
-        try {
-            // Get fresh user data with organization
-            $user = User::with('organization')->find($request->user()->id);
+       public function me(Request $request)
+{
+    try {
+        // Get fresh user data with organization and active subscription
+        $user = User::with(['organization', 'activeSubscription.plan'])
+            ->find($request->user()->id);
 
-            if (!$user) {
-                return response()->json([
-                    'error' => 'User not found',
-                ], 404);
-            }
-
-            // Get current token
-            $currentToken = $request->user()->currentAccessToken();
-
-            // Prepare account flags
-            $flags = [
-                'email_verified' => $user->email_verified_at !== null,
-                'has_organization' => $user->organization !== null,
-                'organization_status' => $user->organization?->status,
-                'can_access_features' => $user->organization?->status === 'approved',
-            ];
-
+        if (!$user) {
             return response()->json([
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'email_verified_at' => $user->email_verified_at,
-                    'user_priviliages' => $user->user_priviliages,
-
-                ],
-                'organization' => $user->organization ? [
-                    'id' => $user->organization->id,
-                    'name' => $user->organization->name,
-                    'sector' => $user->organization->sector,
-                    'email' => $user->organization->email,
-                    'phone' => $user->organization->phone,
-                    'address' => $user->organization->address,
-                    'license_number' => $user->organization->license_number,
-                    'executive_name' => $user->organization->executive_name,
-                    'status' => $user->organization->status,
-                    'shield_percentage' => $user->organization->shield_percentage,
-                    'shield_rank' => $user->organization->shield_rank,
-                    'certificate_final_score' => $user->organization->certificate_final_score,
-                    'certificate_final_rank' => $user->organization->certificate_final_rank,
-                    'established_at' => $user->organization->established_at,
-
-                ] : null,
-                'token' => [
-                    'name' => $currentToken->name,
-                    'abilities' => $currentToken->abilities,
-                    'created_at' => $currentToken->created_at,
-                    'last_used_at' => $currentToken->last_used_at,
-                ],
-                'flags' => $flags,
-            ]);
-
-        } catch (\Throwable $e) {
-            Log::error('Me Endpoint Error: ' . $e->getMessage());
-
-            return response()->json([
-                'error' => $e->getMessage(),
-            ], 500);
+                'error' => 'User not found',
+            ], 404);
         }
+
+        // Get current token
+        $currentToken = $request->user()->currentAccessToken();
+
+        // Get active subscription
+        $activeSubscription = $user->activeSubscription;
+
+        // Prepare account flags
+        $flags = [
+            'email_verified' => $user->email_verified_at !== null,
+            'has_organization' => $user->organization !== null,
+            'organization_status' => $user->organization?->status,
+            'can_access_features' => $user->organization?->status === 'approved',
+            'completed_shield' => $user->organization?->hasSubmittedShield() ?? false,
+            'completed_strategic_certificate' => $user->organization?->hasSubmittedStrategicCertificate() ?? false,
+            'completed_hr_certificate' => $user->organization?->hasSubmittedHrCertificate() ?? false,
+            'completed_operational_certificate' => $user->organization?->hasSubmittedOperationalCertificate() ?? false,
+            'has_active_subscription' => $user->hasActiveSubscription(),
+        ];
+
+        return response()->json([
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'email_verified_at' => $user->email_verified_at,
+                'user_priviliages' => $user->user_priviliages,
+            ],
+            'organization' => $user->organization ? [
+                'id' => $user->organization->id,
+                'name' => $user->organization->name,
+                'sector' => $user->organization->sector,
+                'email' => $user->organization->email,
+                'phone' => $user->organization->phone,
+                'address' => $user->organization->address,
+                'license_number' => $user->organization->license_number,
+                'executive_name' => $user->organization->executive_name,
+                'status' => $user->organization->status,
+                'shield_percentage' => $user->organization->shield_percentage,
+                'shield_rank' => $user->organization->shield_rank,
+                'certificate_final_score' => $user->organization->certificate_final_score,
+                'certificate_final_rank' => $user->organization->certificate_final_rank,
+                'established_at' => $user->organization->established_at,
+            ] : null,
+            'subscription' => $activeSubscription ? [
+                'id' => $activeSubscription->id,
+                'plan' => $activeSubscription->plan ? [
+                    'id' => $activeSubscription->plan->id,
+                    'name' => $activeSubscription->plan->name,
+                    'price' => $activeSubscription->plan->price,
+                    'duration' => $activeSubscription->plan->duration,
+                    'features' => $activeSubscription->plan->features,
+                ] : null,
+                'starts_at' => $activeSubscription->starts_at,
+                'ends_at' => $activeSubscription->ends_at,
+                'is_active' => $activeSubscription->is_active,
+                'days_remaining' => now()->diffInDays($activeSubscription->ends_at, false),
+            ] : null,
+            'token' => [
+                'name' => $currentToken->name,
+                'abilities' => $currentToken->abilities,
+                'created_at' => $currentToken->created_at,
+                'last_used_at' => $currentToken->last_used_at,
+            ],
+            'flags' => $flags,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'An error occurred',
+            'message' => $e->getMessage(),
+        ], 500);
     }
+}
 }

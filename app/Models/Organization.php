@@ -67,5 +67,46 @@ public function certificateAnswers(): HasMany
 {
     return $this->hasMany(CertificateAnswer::class);
 }
+public function hasSubmittedShield(): bool
+{
+    return $this->shieldAxisResponses()->exists();
+}
+
+/**
+ * Check if organization has submitted strategic certificate
+ */
+public function hasSubmittedStrategicCertificate(): bool
+{
+    return $this->certificateAnswers()
+        ->whereHas('certificateQuestion', function ($query) {
+            $query->where('path', 'strategic');
+        })
+        ->exists();
+}
+
+/**
+ * Check if organization has submitted HR certificate
+ */
+public function hasSubmittedHrCertificate(): bool
+{
+    return $this->certificateAnswers()
+        ->whereHas('certificateQuestion', function ($query) {
+            $query->where('path', 'hr');
+        })
+        ->exists();
+}
+
+/**
+ * Check if organization has submitted operational certificate
+ */
+public function hasSubmittedOperationalCertificate(): bool
+{
+    return $this->certificateAnswers()
+        ->whereHas('certificateQuestion', function ($query) {
+            $query->where('path', 'operational');
+        })
+        ->exists();
+}
 
 }
+

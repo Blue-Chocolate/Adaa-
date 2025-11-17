@@ -36,5 +36,9 @@ class CertificateAnswer extends Model
     {
         return $this->belongsTo(CertificateQuestion::class, 'certificate_question_id');
     }
+    public function certificateQuestion()
+{
+    return $this->belongsTo(CertificateQuestion::class);
+}
 
 }

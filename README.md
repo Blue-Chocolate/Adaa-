@@ -2245,7 +2245,7 @@ curl -X POST http://your-domain.com/api/certificates/save/strategic \
 
 **Request:**
 ```bash
-curl -X POST http://your-domain.com/api/certificates/save/strategic \
+curl -X POST /api/certificates/{path}/save \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \

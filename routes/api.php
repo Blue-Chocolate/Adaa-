@@ -139,35 +139,58 @@ Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('shield')->
 });
 
 // Certificate Routes - Requires approved organization
-Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('certificates')->group(function () {
+// Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('certificates')->group(function () {
     
-    // Get summary of all paths for authenticated user's organization
-    Route::get('summary', [CertificateController::class, 'summary'])
-        ->name('certificates.summary');
+//     // Get summary of all paths for authenticated user's organization
+//     Route::get('summary', [CertificateController::class, 'summary'])
+//         ->name('certificates.summary');
     
-    // Get questions by path (strategic, operational, hr)
-    Route::get('questions/{path}', [CertificateController::class, 'getQuestionsByPath'])
-        ->name('certificates.questions');
+//     // Get questions by path (strategic, operational, hr)
+//     Route::get('questions/{path}', [CertificateController::class, 'getQuestionsByPath'])
+//         ->name('certificates.questions');
     
-    // Submit answers for authenticated user's organization (specific path)
-    Route::post('answers/{path}', [CertificateController::class, 'submitAnswers'])
-        ->name('certificates.submit');
+//     // Submit answers for authenticated user's organization (specific path)
+//     Route::post('answers/{path}', [CertificateController::class, 'submitAnswers'])
+//         ->name('certificates.submit');
     
-    // Show certificate details for specific path
-    Route::get('answers/{path}', [CertificateController::class, 'show'])
-        ->name('certificates.show');
+//     // Show certificate details for specific path
+//     Route::get('answers/{path}', [CertificateController::class, 'show'])
+//         ->name('certificates.show');
     
-    // Update answers for specific path
-    Route::put('answers/{path}', [CertificateController::class, 'updateAnswers'])
-        ->name('certificates.update');
+//     // Update answers for specific path
+//     Route::put('answers/{path}', [CertificateController::class, 'updateAnswers'])
+//         ->name('certificates.update');
     
-    // Delete certificate answers for specific path
-    Route::delete('answers/{path}', [CertificateController::class, 'destroy'])
-        ->name('certificates.destroy');
-    Route::get('download/{path}', [CertificateController::class, 'downloadCertificate'])
-        ->name('certificates.download');    
+//     // Delete certificate answers for specific path
+//     Route::delete('answers/{path}', [CertificateController::class, 'destroy'])
+//         ->name('certificates.destroy');
+//     Route::get('download/{path}', [CertificateController::class, 'downloadCertificate'])
+//         ->name('certificates.download');    
+// });
+Route::middleware(['auth:sanctum'])->prefix('certificates')->group(function () {
+    
+    // ➊ Get questions by path
+    Route::get('/questions/{path}', [CertificateController::class, 'getQuestionsByPath']);
+    
+    // ➋ Save answers (any number, no modifications allowed once saved)
+    Route::post('/{path}/save', [CertificateController::class, 'saveAnswers']);
+    
+    // ➌ Submit - Calculate and store final score
+    Route::post('/{path}/submit', [CertificateController::class, 'submitCertificate']);
+    
+    // ➏ Bulk upload answers from URLs (JSON)
+    Route::post('/upload/{path}', [CertificateController::class, 'uploadAnswers']);
+    
+    // ➐ Download certificate data for a specific path
+    Route::get('/download/{path}', [CertificateController::class, 'downloadPath']);
+    
+    // ➑ Download overall certificate data (all paths)
+    Route::get('/download', [CertificateController::class, 'downloadOverall']);
 });
-
+    Route::get('/analytics', [CertificateController::class, 'analytics']);
+    
+    // ➎ Get all registered organizations
+    Route::get('/organizations', [CertificateController::class, 'getAllOrganizations']);
 use App\Http\Controllers\Api\ModelController\ModelController;
 
 Route::get('/models', [ModelController::class, 'index']);

@@ -39,4 +39,5 @@ class CertificateQuestion extends Model
     {
         return $this->hasMany(CertificateAnswer::class, 'certificate_question_id');
     }
+    
 }

@@ -84,4 +84,27 @@ public function subscriptionRequests()
 {
     return $this->hasMany(\App\Models\SubscriptionRequest::class);
 }
+public function activeSubscription()
+{
+    return $this->hasOne(Subscription::class)
+        ->where('is_active', true)
+        ->whereDate('ends_at', '>=', now())
+        ->latest();
+}
+
+/**
+ * Get all user's subscriptions
+ */
+public function subscriptions()
+{
+    return $this->hasMany(Subscription::class);
+}
+
+/**
+ * Check if user has active subscription
+ */
+public function hasActiveSubscription(): bool
+{
+    return $this->activeSubscription()->exists();
+}
 }
