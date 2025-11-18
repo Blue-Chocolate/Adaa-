@@ -252,3 +252,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/subscription-requests', [SubscriptionRequestController::class, 'store']);
     Route::post('/subscription-requests/{id}/approve', [SubscriptionRequestController::class, 'approve']);
 });
+
+use App\Http\Controllers\Api\CertificateScheduleController\CertificateScheduleController;
+
+Route::prefix('schedules')->group(function () {
+
+    // GET /api/certificate-schedules
+    Route::get('/', [CertificateScheduleController::class, 'index']);
+
+    // POST /api/certificate-schedules
+    Route::post('/', [CertificateScheduleController::class, 'store']);
+
+    // GET /api/certificate-schedules/{id}
+    Route::get('/{certificateSchedule}', [CertificateScheduleController::class, 'show']);
+
+    // PUT /api/certificate-schedules/{id}
+
+    // PATCH /api/certificate-schedules/{id}
+
+    // DELETE /api/certificate-schedules/{id}
+});
