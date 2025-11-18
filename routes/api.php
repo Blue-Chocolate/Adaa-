@@ -21,40 +21,40 @@ use App\Http\Controllers\Api\Auth\PasswordResetController;
 
 use App\Http\Controllers\DumpAuthenticationController;
 
-Route::post('/register', [DumpAuthenticationController::class, 'register']);
-Route::post('/login', [DumpAuthenticationController::class, 'login']);
+// Route::post('/register', [DumpAuthenticationController::class, 'register']);
+// Route::post('/login', [DumpAuthenticationController::class, 'login']);
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [DumpAuthenticationController::class, 'logout']);
-    Route::get('/me', [DumpAuthenticationController::class, 'me']);
-});
+// Route::middleware('auth:sanctum')->group(function () {
+//     Route::post('/logout', [DumpAuthenticationController::class, 'logout']);
+//     Route::get('/me', [DumpAuthenticationController::class, 'me']);
+// });
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
 |--------------------------------------------------------------------------
 */
-// Route::post('/register', [AuthController::class, 'register']);
-// Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
 
-// // Email verification routes
-// // Email verification routes - No authentication required
-// Route::get('/email/verify', [EmailVerificationController::class, 'verify'])
-//     ->name('verification.verify');
-// Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
-//     ->name('verification.resend');
+// Email verification routes
+// Email verification routes - No authentication required
+Route::get('/email/verify', [EmailVerificationController::class, 'verify'])
+    ->name('verification.verify');
+Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
+    ->name('verification.resend');
 
-//     Route::post('/password/forgot', [PasswordResetController::class, 'forgotPassword'])
-//         ->name('password.forgot');
-//     Route::post('/password/reset', [PasswordResetController::class, 'resetPassword'])
-//         ->name('password.reset');
-//     Route::get('/password/verify-token', [PasswordResetController::class, 'verifyToken'])
-//         ->name('password.verify-token');
+    Route::post('/password/forgot', [PasswordResetController::class, 'forgotPassword'])
+        ->name('password.forgot');
+    Route::post('/password/reset', [PasswordResetController::class, 'resetPassword'])
+        ->name('password.reset');
+    Route::get('/password/verify-token', [PasswordResetController::class, 'verifyToken'])
+        ->name('password.verify-token');
 
         
-// Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-// Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
-// Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-// Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
+Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
+Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
 
 
 /*
@@ -138,35 +138,7 @@ Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('shield')->
 
 });
 
-// Certificate Routes - Requires approved organization
-// Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('certificates')->group(function () {
-    
-//     // Get summary of all paths for authenticated user's organization
-//     Route::get('summary', [CertificateController::class, 'summary'])
-//         ->name('certificates.summary');
-    
-//     // Get questions by path (strategic, operational, hr)
-//     Route::get('questions/{path}', [CertificateController::class, 'getQuestionsByPath'])
-//         ->name('certificates.questions');
-    
-//     // Submit answers for authenticated user's organization (specific path)
-//     Route::post('answers/{path}', [CertificateController::class, 'submitAnswers'])
-//         ->name('certificates.submit');
-    
-//     // Show certificate details for specific path
-//     Route::get('answers/{path}', [CertificateController::class, 'show'])
-//         ->name('certificates.show');
-    
-//     // Update answers for specific path
-//     Route::put('answers/{path}', [CertificateController::class, 'updateAnswers'])
-//         ->name('certificates.update');
-    
-//     // Delete certificate answers for specific path
-//     Route::delete('answers/{path}', [CertificateController::class, 'destroy'])
-//         ->name('certificates.destroy');
-//     Route::get('download/{path}', [CertificateController::class, 'downloadCertificate'])
-//         ->name('certificates.download');    
-// });
+use App\Http\Controllers\Api\CertificateController\CertificateSummaryController;
 Route::middleware(['auth:sanctum'])->prefix('certificates')->group(function () {
     
     // ➊ Get questions by path
@@ -188,7 +160,7 @@ Route::middleware(['auth:sanctum'])->prefix('certificates')->group(function () {
     Route::get('/download', [CertificateController::class, 'downloadOverall']);
     
     // ➒ Get user summary
-    Route::get('/summary', [CertificateController::class, 'summary']);
+    Route::get('/summary', [CertificateSummaryController::class, 'summary']);
     
     // ➓ Upload file only (get URL back)
     Route::post('/{path}/upload', [CertificateController::class, 'uploadFile']);
@@ -248,9 +220,7 @@ use App\Http\Controllers\Api\SubscriptionRequestController\SubscriptionRequestCo
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/subscription-requests', [SubscriptionRequestController::class, 'index']);
-    Route::get('/subscription-requests/{id}', [SubscriptionRequestController::class, 'show']);
     Route::post('/subscription-requests', [SubscriptionRequestController::class, 'store']);
-    Route::post('/subscription-requests/{id}/approve', [SubscriptionRequestController::class, 'approve']);
 });
 
 use App\Http\Controllers\Api\CertificateScheduleController\CertificateScheduleController;
@@ -266,9 +236,33 @@ Route::prefix('schedules')->group(function () {
     // GET /api/certificate-schedules/{id}
     Route::get('/{certificateSchedule}', [CertificateScheduleController::class, 'show']);
 
-    // PUT /api/certificate-schedules/{id}
 
-    // PATCH /api/certificate-schedules/{id}
-
-    // DELETE /api/certificate-schedules/{id}
 });
+use App\Http\Controllers\Api\CertificateController\CertificateAnalyticsController;
+ Route::middleware('auth:sanctum')->prefix('certificate/analytics')->group(function () {
+       Route::get('/', [CertificateAnalyticsController::class, 'analyticsTable']);
+       Route::get('/table/filtered', [CertificateAnalyticsController::class, 'analyticsTableFiltered']);
+       Route::get('/stats', [CertificateAnalyticsController::class, 'statistics']);
+   });
+
+use App\Http\Controllers\Api\ContactusController\ContactusController;
+Route::post('/contactus', [ContactusController::class, 'store']);
+
+use App\Http\Controllers\Api\CareRequestController\CareRequestController;
+Route::post('/care-requests', [CareRequestController::class, 'store']);
+
+
+use App\Http\Controllers\Api\BlogsCategoriesController\BlogsCategoriesController;
+
+Route::prefix('blogscateogries')->group(function () {
+
+    Route::get('/', [BlogsCategoriesController::class, 'index']);
+    Route::get('/{id}', [BlogsCategoriesController::class, 'show']);
+
+    Route::get('/{id}/blogs', [BlogsCategoriesController::class, 'blogs']);
+    Route::get('/{id}/blogs/{blogId}', [BlogsCategoriesController::class, 'showBlog']);
+});
+
+use App\Http\Controllers\Api\SearchController\SearchController;
+
+Route::get('/search', [SearchController::class, 'search']);

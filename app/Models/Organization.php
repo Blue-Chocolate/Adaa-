@@ -25,6 +25,15 @@ class Organization extends Model
         'shield_rank',
         'certificate_final_score',
         'certificate_final_rank',
+        'certificate_strategic_score',
+        'certificate_operational_score',
+        'certificate_hr_score','certificate_strategic_submitted',
+'certificate_operational_submitted',
+'certificate_hr_submitted',
+'certificate_strategic_submitted_at',
+'certificate_operational_submitted_at',
+'certificate_hr_submitted_at',
+
     ];
 
     protected $casts = [

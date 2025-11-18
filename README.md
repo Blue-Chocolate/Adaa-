@@ -348,16 +348,22 @@ Authentication
 All endpoints require authenticated users using Laravel's API authentication (sanctum or passport).
 
 Endpoints
-1. Subscribe a user to Pro Plan
+1. Subscribation plans
 
-POST /subscriptions/subscribe-pro
+GET /api/plans TO get all existing plans
 
-Description: Subscribes the authenticated user to the "Pro" plan. Automatically deactivates existing subscriptions.
-
-Request:
-
-POST /api/subscriptions/subscribe-pro
+POST /api/subscription-requests
 Authorization: Bearer {token}
+
+POST /api/subscription
+
+{
+  name:hassan
+email:haasklany@gmail.com
+phone:01003232423
+plan_id:1
+receipt_image : "file"
+}
 
 
 Response:
@@ -2505,7 +2511,7 @@ GET /api/admin/certificates/analytics
   }
 }
 ```
-
+GET 
 ---
 
 ### ➎ Get All Organizations
@@ -2643,3 +2649,28 @@ curl -X GET "https://api.example.com/api/certificates/download" \
 4. **File Size**: Maximum 5MB per attachment
 5. **File Types**: pdf, doc, docx, jpg, jpeg, png only
 6. **Paths**: Must be `strategic`, `operational`, or `hr`
+
+
+
+POST api/care-requests
+
+{
+    "entity_name" : "",
+    "name" : "",
+    "phone": "",
+    "entity_type" : "",
+    "message" : ""
+}
+
+
+POST api/contactus
+
+
+{
+    "email": "",
+    "name" : "",
+    "phone" : "",
+    "subject" :" ",
+    "message": ""
+}
+

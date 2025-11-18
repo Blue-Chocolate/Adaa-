@@ -11,14 +11,15 @@ use Illuminate\Support\Facades\Validator;
 
 class SubscriptionRequestController extends Controller
 {
-    public function index()
-    {
-        $requests = SubscriptionRequest::with(['user', 'plan'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+ public function index()
+{
+    $requests = SubscriptionRequest::with(['plan'])
+        ->where('user_id', auth()->id())
+        ->orderBy('created_at', 'desc')
+        ->get();
 
-        return response()->json($requests);
-    }
+    return response()->json($requests);
+}
 
     public function show($id)
     {
@@ -27,33 +28,33 @@ class SubscriptionRequestController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'user_id' => 'required|exists:users,id',
-            'plan_id' => 'required|exists:plans,id',
-            'name' => 'required|string|max:255',
-            'email' => 'required|email',
-            'phone' => 'nullable|string|max:20',
-            'receipt_image' => 'nullable|image|max:2048',
-        ]);
+{
+ $validator = Validator::make($request->all(), [
+    'plan_id' => 'required|exists:plans,id',
+    'name' => 'required|string|max:255',
+    'email' => 'required|email',
+    'phone' => 'nullable|string|max:20',
+    'receipt_image' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf|max:5120',
+]);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
-
-        $data = $validator->validated();
-
-        if ($request->hasFile('receipt_image')) {
-            $data['receipt_image'] = $request->file('receipt_image')->store('receipts', 'public');
-        }
-
-        $subscriptionRequest = SubscriptionRequest::create($data);
-
-        return response()->json([
-            'message' => 'Subscription request created successfully.',
-            'data' => $subscriptionRequest
-        ]);
+    if ($validator->fails()) {
+        return response()->json($validator->errors(), 422);
     }
+
+    $data = $validator->validated();
+    $data['user_id'] = auth()->id(); // get authenticated user ID
+
+    if ($request->hasFile('receipt_image')) {
+        $data['receipt_image'] = $request->file('receipt_image')->store('receipts', 'public');
+    }
+
+    $subscriptionRequest = SubscriptionRequest::create($data);
+
+    return response()->json([
+        'message' => 'Subscription request created successfully.',
+        // 'data' => $subscriptionRequest
+    ]);
+}
 
     public function approve($id)
     {

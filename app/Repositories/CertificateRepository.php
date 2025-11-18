@@ -26,6 +26,8 @@ class CertificateRepository
         $pathsStatus = [];
         $completedCount = 0;
         
+        $organization = Organization::findOrFail($organizationId);
+        
         foreach ($validPaths as $path) {
             $totalQuestions = CertificateQuestion::where('path', $path)->count();
             $answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
@@ -40,22 +42,25 @@ class CertificateRepository
                 })
                 ->sum('final_points');
             
+            // Check if path is submitted
+            $submittedColumn = "certificate_{$path}_submitted";
+            $isSubmitted = $organization->$submittedColumn ?? false;
+            
             $isComplete = $answeredQuestions >= $totalQuestions;
             
             $pathsStatus[$path] = [
                 'answered' => $answeredQuestions,
                 'total' => $totalQuestions,
                 'completed' => $isComplete,
+                'submitted' => $isSubmitted,
                 'score' => $pathScore,
                 'percentage' => $totalQuestions > 0 ? round(($answeredQuestions / $totalQuestions) * 100, 2) : 0,
             ];
             
-            if ($isComplete) {
+            if ($isComplete && $isSubmitted) {
                 $completedCount++;
             }
         }
-        
-        $organization = Organization::findOrFail($organizationId);
         
         return [
             'organization' => [
@@ -74,6 +79,7 @@ class CertificateRepository
             'all_paths_completed' => $completedCount === count($validPaths),
         ];
     }
+
 
     /**
      * 💾 Save answers - once saved, cannot be modified
@@ -186,16 +192,21 @@ class CertificateRepository
                 })
                 ->sum('final_points');
 
-            // Update organization with path-specific score
+            // Update organization with path-specific score AND submission status
             $organization = Organization::findOrFail($organizationId);
             
-            // Map path to column name
+            // Map path to column names
             $pathScoreColumn = "certificate_{$path}_score";
+            $pathSubmittedColumn = "certificate_{$path}_submitted";
+            $pathSubmittedAtColumn = "certificate_{$path}_submitted_at";
+            
             $organization->update([
-                $pathScoreColumn => $pathScore
+                $pathScoreColumn => $pathScore,
+                $pathSubmittedColumn => true,
+                $pathSubmittedAtColumn => now(),
             ]);
 
-            // Check if all 3 paths are complete
+            // Check if all 3 paths are complete AND submitted
             $validPaths = ['strategic', 'operational', 'hr'];
             $completedPaths = 0;
             $pathScores = [];
@@ -207,8 +218,11 @@ class CertificateRepository
                         $q->where('path', $p);
                     })
                     ->count();
+                
+                $submittedCol = "certificate_{$p}_submitted";
+                $isSubmitted = $organization->$submittedCol ?? false;
 
-                if ($pathAnswered >= $pathTotal) {
+                if ($pathAnswered >= $pathTotal && $isSubmitted) {
                     $completedPaths++;
                     
                     // Get score for this path
@@ -257,7 +271,6 @@ class CertificateRepository
             }
         });
     }
-
     /**
      * 📊 Get analytics for all organizations
      */
@@ -551,4 +564,146 @@ class CertificateRepository
             ];
         });
     }
+    public function getAnalyticsTable(): array
+{
+    $validPaths = ['strategic', 'operational', 'hr'];
+    $pathNames = [
+        'strategic' => ['ar' => 'الأداء الاستراتيجي', 'en' => 'Strategic Performance'],
+        'operational' => ['ar' => 'الأداء التشغيلي', 'en' => 'Operational Performance'],
+        'hr' => ['ar' => 'الموارد البشرية', 'en' => 'Human Resources'],
+    ];
+    
+    $organizations = Organization::with(['certificateAnswers.question'])->get();
+    
+    $tableData = [];
+    
+    foreach ($organizations as $org) {
+        foreach ($validPaths as $path) {
+            // Calculate path completion
+            $totalQuestions = CertificateQuestion::where('path', $path)->count();
+            $answeredQuestions = $org->certificateAnswers()
+                ->whereHas('question', function($q) use ($path) {
+                    $q->where('path', $path);
+                })
+                ->count();
+            
+            $percentage = $totalQuestions > 0 
+                ? round(($answeredQuestions / $totalQuestions) * 100) 
+                : 0;
+            
+            // Get path-specific score and rank
+            $pathScore = $org->certificateAnswers()
+                ->whereHas('question', function($q) use ($path) {
+                    $q->where('path', $path);
+                })
+                ->sum('final_points');
+            
+            // Calculate rank for this specific path
+            $pathRank = $this->calculatePathRank($path, $pathScore);
+            
+            // Check if path is submitted
+            $submittedColumn = "certificate_{$path}_submitted";
+            $isSubmitted = $org->$submittedColumn ?? false;
+            
+            $tableData[] = [
+                'organization_id' => $org->id,
+                'organization_name' => $org->name,
+                'path' => $path,
+                'path_name_ar' => $pathNames[$path]['ar'],
+                'path_name_en' => $pathNames[$path]['en'],
+                'percentage' => $percentage,
+                'rank' => $pathRank,
+                'rank_ar' => $this->getRankArabic($pathRank),
+                'rank_icon' => $this->getRankIcon($pathRank),
+                'rank_color' => $this->getRankColor($pathRank),
+                'website' => $org->website,
+                'email' => $org->email,
+                'score' => $pathScore,
+                'answered' => $answeredQuestions,
+                'total' => $totalQuestions,
+                'is_submitted' => $isSubmitted,
+                'is_complete' => $percentage >= 100,
+            ];
+        }
+    }
+    
+    // Sort by percentage descending
+    usort($tableData, function($a, $b) {
+        return $b['percentage'] <=> $a['percentage'];
+    });
+    
+    return [
+        'total_entries' => count($tableData),
+        'total_organizations' => $organizations->count(),
+        'data' => $tableData,
+    ];
+}
+
+/**
+ * 🏆 Calculate rank for a specific path (not overall)
+ */
+private function calculatePathRank(string $path, float $pathScore): string
+{
+    // Calculate max possible score for this specific path
+    $maxScore = CertificateQuestion::where('path', $path)
+        ->get()
+        ->sum(function($question) {
+            $mapping = $question->points_mapping;
+            $maxPoints = is_array($mapping) ? max($mapping) : 0;
+            return $maxPoints * $question->weight;
+        });
+    
+    $normalizedScore = ($maxScore > 0) ? ($pathScore / $maxScore) * 100 : 0;
+
+    return match (true) {
+        $normalizedScore >= 86 => 'diamond',
+        $normalizedScore >= 76 => 'gold',
+        $normalizedScore >= 66 => 'silver',
+        $normalizedScore >= 55 => 'bronze',
+        default => 'bronze',
+    };
+}
+
+/**
+ * 🎨 Get rank icon (emoji or symbol)
+ */
+private function getRankIcon(string $rank): string
+{
+    return match($rank) {
+        'diamond' => '💎',
+        'gold' => '🥇',
+        'silver' => '🥈',
+        'bronze' => '🥉',
+        default => '⚪',
+    };
+}
+
+/**
+ * 📊 Get rank name in Arabic
+ */
+private function getRankArabic(string $rank): string
+{
+    return match($rank) {
+        'diamond' => 'شهادة ماسية',
+        'gold' => 'شهادة ذهبية',
+        'silver' => 'شهادة فضية',
+        'bronze' => 'شهادة برونزية',
+        default => 'بدون شهادة',
+    };
+}
+
+/**
+ * 🎨 Get rank color for UI
+ */
+private function getRankColor(string $rank): string
+{
+    return match($rank) {
+        'diamond' => '#B9F2FF',
+        'gold' => '#FFD700',
+        'silver' => '#C0C0C0',
+        'bronze' => '#CD7F32',
+        default => '#808080',
+    };
+}
+    
 }
