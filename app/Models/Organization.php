@@ -23,6 +23,8 @@ class Organization extends Model
         'executive_name',
         'shield_percentage',
         'shield_rank',
+        'certificate_final_score',
+        'certificate_final_rank',
     ];
 
     protected $casts = [

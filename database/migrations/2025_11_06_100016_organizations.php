@@ -34,12 +34,14 @@
 
             $table->decimal('certificate_final_score', 5, 2)->nullable();
             $table->enum('certificate_final_rank', ['bronze', 'silver', 'gold', 'diamond'])->nullable();
-
+            $table->decimal('certificate_strategic_score', 8, 2)->nullable()->after('certificate_final_score');
+            $table->decimal('certificate_operational_score', 8, 2)->nullable()->after('certificate_strategic_score');
+            $table->decimal('certificate_hr_score', 8, 2)->nullable()->after('certificate_operational_score');
 
 
             $table->timestamps();
         });
-
+ 
             }
 
             /**

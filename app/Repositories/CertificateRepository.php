@@ -20,6 +20,61 @@ class CertificateRepository
             ->get();
     }
 
+    public function getUserSummary(int $organizationId): array
+    {
+        $validPaths = ['strategic', 'operational', 'hr'];
+        $pathsStatus = [];
+        $completedCount = 0;
+        
+        foreach ($validPaths as $path) {
+            $totalQuestions = CertificateQuestion::where('path', $path)->count();
+            $answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
+                ->whereHas('question', function($q) use ($path) {
+                    $q->where('path', $path);
+                })
+                ->count();
+            
+            $pathScore = CertificateAnswer::where('organization_id', $organizationId)
+                ->whereHas('question', function($q) use ($path) {
+                    $q->where('path', $path);
+                })
+                ->sum('final_points');
+            
+            $isComplete = $answeredQuestions >= $totalQuestions;
+            
+            $pathsStatus[$path] = [
+                'answered' => $answeredQuestions,
+                'total' => $totalQuestions,
+                'completed' => $isComplete,
+                'score' => $pathScore,
+                'percentage' => $totalQuestions > 0 ? round(($answeredQuestions / $totalQuestions) * 100, 2) : 0,
+            ];
+            
+            if ($isComplete) {
+                $completedCount++;
+            }
+        }
+        
+        $organization = Organization::findOrFail($organizationId);
+        
+        return [
+            'organization' => [
+                'id' => $organization->id,
+                'name' => $organization->name,
+                'email' => $organization->email,
+            ],
+            'paths' => $pathsStatus,
+            'strategic_score' => $organization->certificate_strategic_score,
+            'operational_score' => $organization->certificate_operational_score,
+            'hr_score' => $organization->certificate_hr_score,
+            'overall_score' => $organization->certificate_final_score,
+            'overall_rank' => $organization->certificate_final_rank,
+            'completed_paths' => $completedCount,
+            'total_paths' => count($validPaths),
+            'all_paths_completed' => $completedCount === count($validPaths),
+        ];
+    }
+
     /**
      * 💾 Save answers - once saved, cannot be modified
      */
@@ -47,7 +102,7 @@ class CertificateRepository
                 if ($existingAnswer) {
                     $skippedCount++;
                     $skippedQuestions[] = $question->id;
-                    continue; // Skip already answered questions
+                    continue;
                 }
                 
                 // 🧹 Normalize selected option
@@ -73,7 +128,7 @@ class CertificateRepository
                     $attachmentPath = $this->extractPathFromUrl($answerInput['attachment_url']);
                 }
 
-                // 💾 Create answer (no updates allowed)
+                // 💾 Create answer
                 CertificateAnswer::create([
                     'organization_id' => $organizationId,
                     'certificate_question_id' => $question->id,
@@ -106,13 +161,13 @@ class CertificateRepository
     }
 
     /**
-     * 🏆 Submit - Just calculate and store final score
+     * 🏆 Submit - Calculate and store final score for path
      */
     public function submitCertificate(int $organizationId, string $path): array
     {
         return DB::transaction(function () use ($organizationId, $path) {
             
-            // Check if all questions are answered
+            // Check if all questions are answered for this path
             $totalQuestions = CertificateQuestion::where('path', $path)->count();
             $answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
                 ->whereHas('question', function($query) use ($path) {
@@ -131,10 +186,19 @@ class CertificateRepository
                 })
                 ->sum('final_points');
 
+            // Update organization with path-specific score
+            $organization = Organization::findOrFail($organizationId);
+            
+            // Map path to column name
+            $pathScoreColumn = "certificate_{$path}_score";
+            $organization->update([
+                $pathScoreColumn => $pathScore
+            ]);
+
             // Check if all 3 paths are complete
             $validPaths = ['strategic', 'operational', 'hr'];
             $completedPaths = 0;
-            $totalScore = 0;
+            $pathScores = [];
 
             foreach ($validPaths as $p) {
                 $pathTotal = CertificateQuestion::where('path', $p)->count();
@@ -146,21 +210,22 @@ class CertificateRepository
 
                 if ($pathAnswered >= $pathTotal) {
                     $completedPaths++;
+                    
+                    // Get score for this path
+                    $score = CertificateAnswer::where('organization_id', $organizationId)
+                        ->whereHas('question', function($q) use ($p) {
+                            $q->where('path', $p);
+                        })
+                        ->sum('final_points');
+                    
+                    $pathScores[$p] = $score;
                 }
-
-                $totalScore += CertificateAnswer::where('organization_id', $organizationId)
-                    ->whereHas('question', function($q) use ($p) {
-                        $q->where('path', $p);
-                    })
-                    ->sum('final_points');
             }
 
-            // Update organization score and rank
-            $organization = Organization::findOrFail($organizationId);
-            
+            // If all paths complete, calculate final rank
             if ($completedPaths === count($validPaths)) {
-                // All paths complete - calculate final rank
-                $rank = $this->calculateRank($totalScore, $path);
+                $totalScore = array_sum($pathScores);
+                $rank = $this->calculateRank($totalScore);
                 
                 $organization->update([
                     'certificate_final_score' => $totalScore,
@@ -173,6 +238,7 @@ class CertificateRepository
                     'all_paths_completed' => true,
                     'completed_paths' => $completedPaths,
                     'total_paths' => count($validPaths),
+                    'path_scores' => $pathScores,
                     'overall_score' => $totalScore,
                     'overall_rank' => $rank,
                 ];
@@ -184,6 +250,7 @@ class CertificateRepository
                     'all_paths_completed' => false,
                     'completed_paths' => $completedPaths,
                     'total_paths' => count($validPaths),
+                    'path_scores' => $pathScores,
                     'overall_score' => null,
                     'overall_rank' => null,
                 ];
@@ -242,6 +309,9 @@ class CertificateRepository
                 'name' => $org->name,
                 'email' => $org->email,
                 'paths' => $pathsStatus,
+                'strategic_score' => $org->certificate_strategic_score,
+                'operational_score' => $org->certificate_operational_score,
+                'hr_score' => $org->certificate_hr_score,
                 'overall_score' => $org->certificate_final_score,
                 'overall_rank' => $org->certificate_final_rank,
                 'completed_paths' => $completedCount,
@@ -312,6 +382,9 @@ class CertificateRepository
                 'phone' => $org->phone ?? null,
                 'created_at' => $org->created_at,
                 'paths' => $pathsStatus,
+                'strategic_score' => $org->certificate_strategic_score,
+                'operational_score' => $org->certificate_operational_score,
+                'hr_score' => $org->certificate_hr_score,
                 'overall_score' => $org->certificate_final_score,
                 'overall_rank' => $org->certificate_final_rank,
             ];
@@ -366,12 +439,25 @@ class CertificateRepository
     }
 
     /**
-     * 🏆 Calculate rank based on score and path
+     * 🏆 Calculate rank based on total score across all paths
      */
-    private function calculateRank(float $score, string $path): string
+    private function calculateRank(float $totalScore): string
     {
-        $maxScore = $this->getMaxScore($path);
-        $normalizedScore = ($maxScore > 0) ? ($score / $maxScore) * 100 : 0;
+        // Calculate max possible score across all paths
+        $maxScore = 0;
+        $validPaths = ['strategic', 'operational', 'hr'];
+        
+        foreach ($validPaths as $path) {
+            $maxScore += CertificateQuestion::where('path', $path)
+                ->get()
+                ->sum(function($question) {
+                    $mapping = $question->points_mapping;
+                    $maxPoints = is_array($mapping) ? max($mapping) : 0;
+                    return $maxPoints * $question->weight;
+                });
+        }
+        
+        $normalizedScore = ($maxScore > 0) ? ($totalScore / $maxScore) * 100 : 0;
 
         return match (true) {
             $normalizedScore >= 86 => 'diamond',
@@ -380,20 +466,6 @@ class CertificateRepository
             $normalizedScore >= 55 => 'bronze',
             default => 'bronze',
         };
-    }
-
-    /**
-     * 📈 Get maximum possible score for path
-     */
-    private function getMaxScore(string $path): float
-    {
-        return CertificateQuestion::where('path', $path)
-            ->get()
-            ->sum(function($question) {
-                $mapping = $question->points_mapping;
-                $maxPoints = is_array($mapping) ? max($mapping) : 0;
-                return $maxPoints * $question->weight;
-            });
     }
 
     /**
@@ -462,22 +534,21 @@ class CertificateRepository
                 }
             }
 
-
             $totalQuestions = CertificateQuestion::where('path', $path)->count();
-$answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
-    ->whereHas('question', function($query) use ($path) {
-        $query->where('path', $path);
-    })
-    ->count();
+            $answeredQuestions = CertificateAnswer::where('organization_id', $organizationId)
+                ->whereHas('question', function($query) use ($path) {
+                    $query->where('path', $path);
+                })
+                ->count();
 
-return [
-    'saved_count' => $savedCount,
-    'skipped_count' => $skippedCount,
-    'errors' => $errors,
-    'answered_questions' => $answeredQuestions,
-    'total_questions' => $totalQuestions,
-    'is_complete' => $answeredQuestions >= $totalQuestions,
-];
+            return [
+                'saved_count' => $savedCount,
+                'skipped_count' => $skippedCount,
+                'errors' => $errors,
+                'answered_questions' => $answeredQuestions,
+                'total_questions' => $totalQuestions,
+                'is_complete' => $answeredQuestions >= $totalQuestions,
+            ];
         });
     }
 }

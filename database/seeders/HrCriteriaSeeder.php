@@ -58,6 +58,11 @@ class HrCriteriaSeeder extends Seeder
 
     /**
      * Get all axes data
+     * 
+     * WEIGHT SYSTEM EXPLANATION:
+     * - Axis weight: Represents the axis importance (e.g., 10% = 0.10)
+     * - Question weight: Represents question importance WITHIN the axis (e.g., 30% = 0.30)
+     * - Final calculation: base_points × question_weight × axis_weight
      */
     private function getAxesData(): array
     {
@@ -68,7 +73,7 @@ class HrCriteriaSeeder extends Seeder
             [
                 'name' => 'الهيكل التنظيمي والتخطيط',
                 'description' => 'تقييم تنظيم الهيكل التنظيمي للجمعية',
-                'weight' => 10,
+                'weight' => 0.10, // 10% of total
                 'questions' => [
                     [
                         'question_text' => 'هل لدى الجمعية هيكل تنظيمي معتمد ومحدث؟',
@@ -80,7 +85,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 30,
+                        'weight' => 0.30, // 30% of this axis
                     ],
                     [
                         'question_text' => 'هل توجد توصيفات وظيفية واضحة ومكتوبة لكل وظيفة؟',
@@ -92,7 +97,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25, // 25% of this axis
                     ],
                     [
                         'question_text' => 'هل يوجد تخطيط للقوى العاملة وخطط إحلال وظيفي؟',
@@ -104,7 +109,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 20,
+                        'weight' => 0.20, // 20% of this axis
                     ],
                     [
                         'question_text' => 'هل خطوط الاتصال والصلاحيات واضحة ومطبقة؟',
@@ -116,7 +121,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => false,
-                        'weight' => 15,
+                        'weight' => 0.15, // 15% of this axis
                     ],
                     [
                         'question_text' => 'هل تتم مراجعة الهيكل دورياً وفق التغيرات؟',
@@ -128,7 +133,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 10,
+                        'weight' => 0.10, // 10% of this axis
                     ],
                 ],
             ],
@@ -139,7 +144,7 @@ class HrCriteriaSeeder extends Seeder
             [
                 'name' => 'الاستقطاب والتوظيف',
                 'description' => 'تقييم أنظمة الاستقطاب والتوظيف',
-                'weight' => 20,
+                'weight' => 0.20, // 20% of total
                 'questions' => [
                     [
                         'question_text' => 'هل توجد سياسات وإجراءات واضحة للاستقطاب والتوظيف؟',
@@ -151,7 +156,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل تتم عمليات التوظيف بمعايير عادلة وشفافة؟',
@@ -163,7 +168,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل يتم الإعلان عن الوظائف داخلياً وخارجياً بشكل مناسب؟',
@@ -175,7 +180,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 20,
+                        'weight' => 0.20,
                     ],
                     [
                         'question_text' => 'هل تستخدم أدوات تقييم معيارية قبل التعيين؟',
@@ -187,7 +192,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                     [
                         'question_text' => 'هل يوجد سجل موحد لعمليات التوظيف والمرشحين؟',
@@ -199,7 +204,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                 ],
             ],
@@ -210,7 +215,7 @@ class HrCriteriaSeeder extends Seeder
             [
                 'name' => 'التدريب وتطوير الموارد',
                 'description' => 'تقييم خطط التدريب وتطوير الموارد البشرية',
-                'weight' => 15,
+                'weight' => 0.15,
                 'questions' => [
                     [
                         'question_text' => 'هل توجد خطة تدريب سنوية مبنية على احتياجات فعلية؟',
@@ -222,7 +227,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 30,
+                        'weight' => 0.30,
                     ],
                     [
                         'question_text' => 'هل يتم قياس أثر التدريب على الأداء؟',
@@ -234,7 +239,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل تشمل الخطة جميع المستويات (إداري/تنفيذي/تطويري)؟',
@@ -246,7 +251,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => false,
-                        'weight' => 20,
+                        'weight' => 0.20,
                     ],
                     [
                         'question_text' => 'هل توثق البرامج التدريبية المنفذة؟',
@@ -258,7 +263,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                     [
                         'question_text' => 'هل توجد ميزانية سنوية مخصصة للتدريب؟',
@@ -270,7 +275,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 10,
+                        'weight' => 0.10,
                     ],
                 ],
             ],
@@ -281,7 +286,7 @@ class HrCriteriaSeeder extends Seeder
             [
                 'name' => 'إدارة الأداء',
                 'description' => 'تقييم أنظمة تقييم الأداء',
-                'weight' => 15,
+                'weight' => 0.15,
                 'questions' => [
                     [
                         'question_text' => 'هل يوجد نظام تقييم أداء دوري وواضح؟',
@@ -293,7 +298,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 30,
+                        'weight' => 0.30,
                     ],
                     [
                         'question_text' => 'هل ترتبط نتائج التقييم بالترقيات أو المكافآت أو التطوير؟',
@@ -305,7 +310,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل تنفذ التقييمات بشكل منهجي وفي مواعيدها؟',
@@ -317,7 +322,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => false,
-                        'weight' => 20,
+                        'weight' => 0.20,
                     ],
                     [
                         'question_text' => 'هل يحق للموظف مناقشة تقييمه وتقديم ملاحظات؟',
@@ -329,7 +334,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => false,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                     [
                         'question_text' => 'هل تحلل نتائج الأداء دورياً للتحسين؟',
@@ -341,7 +346,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 10,
+                        'weight' => 0.10,
                     ],
                 ],
             ],
@@ -352,7 +357,7 @@ class HrCriteriaSeeder extends Seeder
             [
                 'name' => 'الرواتب والمزايا',
                 'description' => 'تقييم أنظمة التعويضات والحوافز',
-                'weight' => 15,
+                'weight' => 0.15,
                 'questions' => [
                     [
                         'question_text' => 'هل تتوافق الرواتب مع سلم معتمد من مجلس الإدارة؟',
@@ -364,7 +369,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل توجد معايير واضحة لصرف الحوافز والمكافآت؟',
@@ -376,7 +381,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل المزايا موحدة وعادلة للجميع (إجازات/تأمينات/بدلات)؟',
@@ -388,7 +393,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => false,
-                        'weight' => 20,
+                        'weight' => 0.20,
                     ],
                     [
                         'question_text' => 'هل تتم مراجعة الرواتب دورياً مقارنة بالسوق؟',
@@ -400,7 +405,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                     [
                         'question_text' => 'هل تدرج الرواتب على نظام مؤمن وإلكتروني؟',
@@ -412,7 +417,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => false,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                 ],
             ],
@@ -423,7 +428,7 @@ class HrCriteriaSeeder extends Seeder
             [
                 'name' => 'الثقافة والرضا الوظيفي',
                 'description' => 'تقييم برامج تنمية الثقافة التنظيمية',
-                'weight' => 15,
+                'weight' => 0.15,
                 'questions' => [
                     [
                         'question_text' => 'هل توجد مبادرات مستمرة لتحسين بيئة العمل؟',
@@ -435,7 +440,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل يقاس رضا الموظفين دورياً بأداة معتمدة؟',
@@ -447,7 +452,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 20,
+                        'weight' => 0.20,
                     ],
                     [
                         'question_text' => 'هل توجد قنوات فعالة للتواصل الداخلي؟',
@@ -459,7 +464,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 20,
+                        'weight' => 0.20,
                     ],
                     [
                         'question_text' => 'هل تشجع المشاركة والابتكار بين العاملين؟',
@@ -471,7 +476,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 20,
+                        'weight' => 0.20,
                     ],
                     [
                         'question_text' => 'هل يشعر الموظفون بالانتماء والعدالة؟',
@@ -483,7 +488,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                 ],
             ],
@@ -494,7 +499,7 @@ class HrCriteriaSeeder extends Seeder
             [
                 'name' => 'الالتزام والتشريعات',
                 'description' => 'تقييم الالتزام بالأنظمة والقوانين',
-                'weight' => 10,
+                'weight' => 0.10,
                 'questions' => [
                     [
                         'question_text' => 'هل تطبق أنظمة العمل السعودية بالكامل؟',
@@ -506,7 +511,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => false,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل جميع الموظفين مسجلين بالتأمينات الاجتماعية؟',
@@ -518,7 +523,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 25,
+                        'weight' => 0.25,
                     ],
                     [
                         'question_text' => 'هل توجد آليات للامتثال الداخلي والمراجعة الدورية؟',
@@ -530,7 +535,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 20,
+                        'weight' => 0.20,
                     ],
                     [
                         'question_text' => 'هل يتم تدريب الموظفين على السياسات واللوائح؟',
@@ -542,7 +547,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                     [
                         'question_text' => 'هل توجد سجلات موثقة للامتثال والتدقيق؟',
@@ -554,7 +559,7 @@ class HrCriteriaSeeder extends Seeder
                             'مطبق بالكامل وموثق' => 100,
                         ],
                         'attachment_required' => true,
-                        'weight' => 15,
+                        'weight' => 0.15,
                     ],
                 ],
             ],
