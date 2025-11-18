@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             $this->call(StrategicCertificateSeeder::class);
             $this->call(OperationalCertificateSeeder::class);
             $this->call(HrCriteriaSeeder::class);
+            $this->call(PlanSeeder::class);
 
         User::factory()->create([
             'name' => 'Test User',
