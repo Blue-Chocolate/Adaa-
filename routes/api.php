@@ -239,11 +239,11 @@ Route::prefix('schedules')->group(function () {
 
 });
 use App\Http\Controllers\Api\CertificateController\CertificateAnalyticsController;
- Route::middleware('auth:sanctum')->prefix('certificate/analytics')->group(function () {
-       Route::get('/', [CertificateAnalyticsController::class, 'analyticsTable']);
-       Route::get('/table/filtered', [CertificateAnalyticsController::class, 'analyticsTableFiltered']);
-       Route::get('/organizations', [CertificateAnalyticsController::class, 'statistics']);
-   });
+Route::prefix('certificate/analytics')->group(function () {
+    Route::get('/', [CertificateAnalyticsController::class, 'analyticsTable']);
+    Route::get('/table/filtered', [CertificateAnalyticsController::class, 'analyticsTableFiltered']);
+    Route::get('/organizations', [CertificateAnalyticsController::class, 'statistics']);
+});
 
 use App\Http\Controllers\Api\ContactusController\ContactusController;
 Route::post('/contactus', [ContactusController::class, 'store']);
