@@ -12,6 +12,7 @@ class Blog extends Model
     protected $fillable = [
         'title',
         'description',
+        'blogs_category_id',
         'content',
         'author',
         'image',
@@ -21,4 +22,9 @@ class Blog extends Model
     protected $casts = [
         'published_at' => 'datetime',
     ];
+
+    public function category()
+{
+    return $this->belongsTo(BlogsCategories::class, 'blogs_category_id');
+}
 }

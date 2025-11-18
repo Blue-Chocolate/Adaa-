@@ -4,12 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\BlogResource\Pages;
 use App\Models\Blog;
+use App\Models\BlogsCategory;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\Str;
 
 class BlogResource extends Resource
 {
@@ -19,10 +19,14 @@ class BlogResource extends Resource
     protected static ?string $navigationLabel = 'Blogs';
     protected static ?string $pluralLabel = 'Blogs';
 
-    public static function form(Form $form): Form
+    public static function form(Forms\Form $form): Forms\Form
     {
         return $form
             ->schema([
+                Forms\Components\Select::make('blogs_category_id')
+                    ->label('Category')
+                    ->relationship('category', 'name')
+                    ->required(),
                 Forms\Components\TextInput::make('title')
                     ->required()
                     ->maxLength(255),
@@ -46,7 +50,7 @@ class BlogResource extends Resource
             ]);
     }
 
-    public static function table(Table $table): Table
+    public static function table(Tables\Table $table): Tables\Table
     {
         return $table
             ->columns([
@@ -58,6 +62,10 @@ class BlogResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('author')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('category.name') // display category
+                    ->label('Category')
+                    ->sortable()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('published_at')
                     ->dateTime('Y-m-d')
                     ->sortable(),

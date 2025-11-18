@@ -242,7 +242,7 @@ use App\Http\Controllers\Api\CertificateController\CertificateAnalyticsControlle
  Route::middleware('auth:sanctum')->prefix('certificate/analytics')->group(function () {
        Route::get('/', [CertificateAnalyticsController::class, 'analyticsTable']);
        Route::get('/table/filtered', [CertificateAnalyticsController::class, 'analyticsTableFiltered']);
-       Route::get('/stats', [CertificateAnalyticsController::class, 'statistics']);
+       Route::get('/organizations', [CertificateAnalyticsController::class, 'statistics']);
    });
 
 use App\Http\Controllers\Api\ContactusController\ContactusController;

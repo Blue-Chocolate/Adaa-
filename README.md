@@ -2458,7 +2458,7 @@ Get comprehensive analytics about all organizations.
 
 **Request:**
 ```http
-GET /api/admin/certificates/analytics
+GET /certificates/analytics
 ```
 
 **Success Response (200):**
