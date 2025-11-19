@@ -3,21 +3,33 @@
 namespace App\Repositories;
 
 use App\Models\Blog;
-use App\Models\BlogsCategories;
 
 class SearchRepository
 {
-    public function searchBlogs($query, $limit = 10)
+    /**
+     * Search blogs by string across multiple columns (title, content, description)
+     *
+     * @param string $query
+     * @param int $limit
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function searchBlogs(string $query, int $limit = 10)
     {
         return Blog::where('title', 'like', "%{$query}%")
             ->orWhere('content', 'like', "%{$query}%")
-            ->paginate($limit);
+            ->orWhere('description', 'like', "%{$query}%")
+            ->limit($limit)
+            ->get();
     }
 
-    public function searchCategories($query, $limit = 10)
+    /**
+     * Get a blog by ID
+     *
+     * @param int $id
+     * @return Blog|null
+     */
+    public function getBlogById(int $id)
     {
-        return BlogsCategories::where('name', 'like', "%{$query}%")
-            ->orWhere('description', 'like', "%{$query}%")
-            ->paginate($limit);
-}
+        return Blog::find($id);
+    }
 }

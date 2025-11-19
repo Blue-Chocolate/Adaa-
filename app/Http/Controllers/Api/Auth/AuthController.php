@@ -13,6 +13,13 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+
+
+
 
 
 
@@ -70,48 +77,76 @@ class AuthController extends Controller
      * Login user
      * POST /api/login
      */
-    public function login(LoginRequest $request): JsonResponse
+    public function login(Request $request)
     {
         try {
-            $result = $this->authService->login($request->validated());
+            $request->validate([
+                'email'    => 'required|email',
+                'password' => 'required',
+            ]);
 
-            if (!$result['success']) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $result['message']
-                ], 401);
+            $user = User::where('email', $request->email)->first();
+
+            if (!$user || !Hash::check($request->password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'email' => ['Invalid email or password.'],
+                ]);
             }
 
+            // Delete old tokens (optional for single-login behavior)
+            $user->tokens()->delete();
+
+            $token = $user->createToken('api_token')->plainTextToken;
+
+            // Load organization relationship
+            $user->load('organization');
+
+            // Prepare account flags
+            $flags = [
+                'email_verified' => $user->email_verified_at !== null,
+                'has_organization' => $user->organization !== null,
+                'organization_status' => $user->organization?->status,
+                'can_access_features' => $user->organization?->status === 'approved',
+            ];
+
             return response()->json([
-                'success' => true,
                 'message' => 'Login successful',
-                'token' => $result['token'],
-                'user' => $result['user']
-            ], 200);
-
-        } catch (QueryException $e) {
-            Log::error('Database error during login', [
-                'error' => $e->getMessage(),
-                'email' => $request->email
+                'token'   => $token,
+                'user'    => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'email_verified_at' => $user->email_verified_at,
+                    'user_priviliages' => $user->user_priviliages,
+                    'created_at' => $user->created_at,
+                ],
+                'organization' => $user->organization ? [
+                    'id' => $user->organization->id,
+                    'name' => $user->organization->name,
+                    'sector' => $user->organization->sector,
+                    'email' => $user->organization->email,
+                    'phone' => $user->organization->phone,
+                    'status' => $user->organization->status,
+                    'shield_percentage' => $user->organization->shield_percentage,
+                    'shield_rank' => $user->organization->shield_rank,
+                    'certificate_final_score' => $user->organization->certificate_final_score,
+                    'certificate_final_rank' => $user->organization->certificate_final_rank,
+                    'established_at' => $user->organization->established_at,
+                    'created_at' => $user->organization->created_at,
+                ] : null,
+                'flags' => $flags,
             ]);
 
+        } catch (ValidationException $e) {
             return response()->json([
-                'success' => false,
-                'message' => 'Database error occurred',
-                'error' => config('app.debug') ? $e->getMessage() : 'Please try again later'
-            ], 500);
+                'error' => $e->errors(),
+            ], 401);
+        } catch (\Throwable $e) {
+            Log::error('Login Error: ' . $e->getMessage());
 
-        } catch (Exception $e) {
-            Log::error('Login failed', [
+            return response()->json([
                 'error' => $e->getMessage(),
-                'email' => $request->email,
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Login failed',
-                'error' => config('app.debug') ? $e->getMessage() : 'An unexpected error occurred'
             ], 500);
         }
     }
@@ -153,85 +188,90 @@ class AuthController extends Controller
             ], 500);
         }
     }
-     public function me(): JsonResponse
-    {
-        try {
-            $user = Auth::user();
+      public function me(Request $request)
+{
+    try {
+        // Get fresh user data with organization and active subscription
+        $user = User::with(['organization', 'activeSubscription.plan'])
+            ->find($request->user()->id);
 
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated',
-                ], 401);
-            }
-
-            // Perform LEFT JOIN to get user's organization if it exists
-            $data = DB::table('users')
-                ->leftJoin('organizations', 'users.id', '=', 'organizations.user_id')
-                ->where('users.id', $user->id)
-                ->select(
-                    'users.id',
-                    'users.name',
-                    'users.email',
-                    'users.phone',
-                    'users.user_priviliages',
-                    'organizations.id as organization_id',
-                    'organizations.name as organization_name',
-                    'organizations.sector',
-                    'organizations.established_at',
-                    'organizations.email as organization_email',
-                    'organizations.phone as organization_phone',
-                    'organizations.address',
-                    'organizations.license_number',
-                    'organizations.executive_name',
-                    'organizations.shield_percentage',
-                    'organizations.shield_rank',
-                    'organizations.certificate_final_score',
-                    'organizations.certificate_final_rank'
-                )
-                ->first();
-
-            // Build clean JSON response
-            $response = [
-                'success' => true,
-                'token' => request()->bearerToken(),
-                'user' => [
-                    'id' => $data->id,
-                    'name' => $data->name,
-                    'email' => $data->email,
-                    'phone' => $data->phone,
-                    'user_priviliages' => $data->user_priviliages,
-                    'organization' => $data->organization_id ? [
-                        'id' => $data->organization_id,
-                        'name' => $data->organization_name,
-                        'sector' => $data->sector,
-                        'established_at' => $data->established_at,
-                        'email' => $data->organization_email,
-                        'phone' => $data->organization_phone,
-                        'address' => $data->address,
-                        'license_number' => $data->license_number,
-                        'executive_name' => $data->executive_name,
-                        'shield_percentage' => $data->shield_percentage,
-                        'shield_rank' => $data->shield_rank,
-                        'certificate_final_score' => $data->certificate_final_score,
-                        'certificate_final_rank' => $data->certificate_final_rank,
-                    ] : null,
-                ]
-            ];
-
-            return response()->json($response, 200);
-
-        } catch (Exception $e) {
-            Log::error('Failed to fetch current user', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
+        if (!$user) {
             return response()->json([
-                'success' => false,
-                'message' => 'Unable to fetch user data',
-                'error' => config('app.debug') ? $e->getMessage() : 'Unexpected error occurred'
-            ], 500);
+                'error' => 'User not found',
+            ], 404);
         }
+
+        // Get current token
+        $currentToken = $request->user()->currentAccessToken();
+
+        // Get active subscription
+        $activeSubscription = $user->activeSubscription;
+
+        // Prepare account flags
+        $flags = [
+            'email_verified' => $user->email_verified_at !== null,
+            'has_organization' => $user->organization !== null,
+            'organization_status' => $user->organization?->status,
+            'can_access_features' => $user->organization?->status === 'approved',
+            'completed_shield' => $user->organization?->hasSubmittedShield() ?? false,
+            'completed_strategic_certificate' => $user->organization?->hasSubmittedStrategicCertificate() ?? false,
+            'completed_hr_certificate' => $user->organization?->hasSubmittedHrCertificate() ?? false,
+            'completed_operational_certificate' => $user->organization?->hasSubmittedOperationalCertificate() ?? false,
+            'has_active_subscription' => $user->hasActiveSubscription(),
+        ];
+
+        return response()->json([
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'email_verified_at' => $user->email_verified_at,
+                'user_priviliages' => $user->user_priviliages,
+            ],
+            'organization' => $user->organization ? [
+                'id' => $user->organization->id,
+                'name' => $user->organization->name,
+                'sector' => $user->organization->sector,
+                'email' => $user->organization->email,
+                'phone' => $user->organization->phone,
+                'address' => $user->organization->address,
+                'license_number' => $user->organization->license_number,
+                'executive_name' => $user->organization->executive_name,
+                'status' => $user->organization->status,
+                'shield_percentage' => $user->organization->shield_percentage,
+                'shield_rank' => $user->organization->shield_rank,
+                'certificate_final_score' => $user->organization->certificate_final_score,
+                'certificate_final_rank' => $user->organization->certificate_final_rank,
+                'established_at' => $user->organization->established_at,
+            ] : null,
+            'subscription' => $activeSubscription ? [
+                'id' => $activeSubscription->id,
+                'plan' => $activeSubscription->plan ? [
+                    'id' => $activeSubscription->plan->id,
+                    'name' => $activeSubscription->plan->name,
+                    'price' => $activeSubscription->plan->price,
+                    'duration' => $activeSubscription->plan->duration,
+                    'features' => $activeSubscription->plan->features,
+                ] : null,
+                'starts_at' => $activeSubscription->starts_at,
+                'ends_at' => $activeSubscription->ends_at,
+                'is_active' => $activeSubscription->is_active,
+                'days_remaining' => now()->diffInDays($activeSubscription->ends_at, false),
+            ] : null,
+            'token' => [
+                'name' => $currentToken->name,
+                'abilities' => $currentToken->abilities,
+                'created_at' => $currentToken->created_at,
+                'last_used_at' => $currentToken->last_used_at,
+            ],
+            'flags' => $flags,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'An error occurred',
+            'message' => $e->getMessage(),
+        ], 500);
     }
+}
 }

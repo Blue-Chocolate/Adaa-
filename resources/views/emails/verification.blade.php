@@ -59,8 +59,8 @@
             <a href="{{ $verificationUrl }}" class="button">Verify Email Address</a>
         </div>
         
-        <p>Or copy and paste this URL into your browser:</p>
-        <p style="word-break: break-all; color: #666;">{{ $verificationUrl }}</p>
+        <!-- <p>Or copy and paste this URL into your browser:</p>
+        <p style="word-break: break-all; color: #666;">{{ $verificationUrl }}</p> -->
         
         <div class="warning">
             <strong>⚠️ Important:</strong> This verification link will expire in 10 minutes.

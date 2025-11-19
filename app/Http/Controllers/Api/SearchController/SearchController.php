@@ -28,11 +28,19 @@ class SearchController extends Controller
 
         $limit = $request->query('limit', 10);
 
+        // If $q is numeric, treat as blog ID
+        if (is_numeric($q)) {
+            $blogs = $this->repo->getBlogById($q);
+            $blogs = $blogs ? [$blogs] : [];
+        } else {
+            // Otherwise search by string across multiple columns
+            $blogs = $this->repo->searchBlogs($q, $limit);
+        }
+
         return response()->json([
             'success' => true,
             'query' => $q,
-            'blogs' => $this->repo->searchBlogs($q, $limit),
-            'categories' => $this->repo->searchCategories($q, $limit),
-   ]);
+            'blogs' => $blogs,
+        ]);
     }
 }

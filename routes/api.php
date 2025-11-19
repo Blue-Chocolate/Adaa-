@@ -26,7 +26,7 @@ use App\Http\Controllers\DumpAuthenticationController;
 
 // Route::middleware('auth:sanctum')->group(function () {
 //     Route::post('/logout', [DumpAuthenticationController::class, 'logout']);
-//     Route::get('/me', [DumpAuthenticationController::class, 'me']);
+    // Route::get('/me', [DumpAuthenticationController::class, 'me']);
 // });
 /*
 |--------------------------------------------------------------------------
@@ -53,8 +53,7 @@ Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
         
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
-Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
+
 
 
 /*
