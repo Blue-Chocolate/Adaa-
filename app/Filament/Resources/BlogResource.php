@@ -23,7 +23,7 @@ class BlogResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Select::make('blogs_category_id')
+                Forms\Components\Select::make('blogs_categories_id')
                     ->label('Category')
                     ->relationship('category', 'name')
                     ->required(),

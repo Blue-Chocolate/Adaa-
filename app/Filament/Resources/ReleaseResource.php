@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ReleaseResource\Pages;
 use App\Models\Release;
+use App\Models\ReleaseCategory;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -14,7 +15,7 @@ class ReleaseResource extends Resource
 {
     protected static ?string $model = Release::class;
 
-protected static ?string $navigationIcon = 'heroicon-o-archive-box';
+    protected static ?string $navigationIcon = 'heroicon-o-archive-box';
     protected static ?string $navigationLabel = 'Releases';
     protected static ?string $navigationGroup = 'Media';
 
@@ -32,6 +33,12 @@ protected static ?string $navigationIcon = 'heroicon-o-archive-box';
                         Forms\Components\Textarea::make('description')
                             ->label('Description')
                             ->rows(3),
+
+                        Forms\Components\Select::make('release_category_id')
+                            ->label('Category')
+                            ->relationship('category', 'name')
+                            ->searchable()
+                            ->required(),
 
                         Forms\Components\FileUpload::make('file_path')
                             ->label('PDF File')
@@ -67,6 +74,11 @@ protected static ?string $navigationIcon = 'heroicon-o-archive-box';
                     ->label('Title')
                     ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('category.name')
+                    ->label('Category')
+                    ->sortable()
+                    ->searchable(),
 
                 Tables\Columns\TextColumn::make('description')
                     ->label('Description')
