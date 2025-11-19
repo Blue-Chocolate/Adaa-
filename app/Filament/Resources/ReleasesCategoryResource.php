@@ -13,7 +13,7 @@ use Filament\Tables\Table;
 class ReleasesCategoryResource extends Resource
 {
     protected static ?string $model = ReleaseCategory::class;
-    protected static ?string $navigationIcon = 'heroicon-o-collection';
+    protected static ?string $navigationIcon = 'heroicon-o-archive-box';
     protected static ?string $navigationGroup = 'Releases';
 
     public static function form(Form $form): Form

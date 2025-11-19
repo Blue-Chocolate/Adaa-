@@ -6,7 +6,7 @@ use App\Filament\Resources\ReleasesCategoryResource;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
-class CreateReleasesCategory extends CreateRecord
+class CreateReleaseCategory extends CreateRecord
 {
-    protected static string $resource = ReleasesCategoryResource::class;
+    protected static string $resource = ReleaseCategoryResource::class;
 }

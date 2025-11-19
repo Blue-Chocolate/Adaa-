@@ -9,4 +9,11 @@ use Filament\Resources\Pages\ListRecords;
 class ListReleasesCategories extends ListRecords
 {
     protected static string $resource = ReleasesCategoryResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\CreateAction::make(),
+        ];
+    }
 }

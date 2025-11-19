@@ -12,7 +12,7 @@ class Blog extends Model
     protected $fillable = [
         'title',
         'description',
-        'blogs_category_id',
+        'blogs_categories_id',
         'content',
         'author',
         'image',
@@ -25,6 +25,6 @@ class Blog extends Model
 
     public function category()
 {
-    return $this->belongsTo(BlogsCategories::class, 'blogs_category_id');
+    return $this->belongsTo(BlogsCategories::class, 'blogs_categories_id');
 }
 }

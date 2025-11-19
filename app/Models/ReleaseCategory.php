@@ -8,4 +8,9 @@ class ReleaseCategory extends Model
 {
     protected $table = 'releases_categories';
     protected $fillable = ['name', 'description', 'slug'];
+
+        public function releases()
+    {
+     return $this->hasMany(Release::class, 'release_category_id');
+    }
 }

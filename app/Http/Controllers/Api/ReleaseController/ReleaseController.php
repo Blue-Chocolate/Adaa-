@@ -28,13 +28,19 @@ class ReleaseController extends Controller
 
         $releases = $this->repo->paginate($limit, $page);
 
-        $data = collect($releases->items())->map(function ($r) {
+        $data = collect($releases->items())->map(function ($release) {
             return [
-                'id' => (string) $r->id,
-                'title' => $r->title,
-                'short_description' => Str::limit(strip_tags($r->description ?? ''), 160),
-                'published_date' => optional($r->created_at)->toDateString(),
-                'image' => $r->image ? url('storage/' . $r->image) : null,
+                'id' => (string) $release->id,
+                'title' => $release->title,
+                'short_description' => Str::limit(strip_tags($release->description ?? ''), 160),
+                'description' => $release->description,
+                'author' => $release->author ?? 'Admin',
+                'published_date' => optional($release->created_at)->toDateString(),
+                'image' => $release->image ? url('storage/' . $release->image) : null,
+                'category' => $release->category ? $release->category->name : null,
+                'file_path' => $release->file_path ? url('storage/' . $release->file_path) : null,
+                'excel_path' => $release->excel_path ? url('storage/' . $release->excel_path) : null,
+                'powerbi_path' => $release->powerbi_path ? url('storage/' . $release->powerbi_path) : null,
             ];
         });
 
@@ -70,6 +76,10 @@ class ReleaseController extends Controller
                 'author' => $release->author ?? 'Admin',
                 'published_date' => optional($release->created_at)->toDateString(),
                 'image' => $release->image ? url('storage/' . $release->image) : null,
+                'category' => $release->category ? $release->category->name : null,
+                'file_path' => $release->file_path ? url('storage/' . $release->file_path) : null,
+                'excel_path' => $release->excel_path ? url('storage/' . $release->excel_path) : null,
+                'powerbi_path' => $release->powerbi_path ? url('storage/' . $release->powerbi_path) : null,
             ],
         ]);
     }
