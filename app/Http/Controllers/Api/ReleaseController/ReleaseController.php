@@ -31,6 +31,19 @@ class ReleaseController extends Controller
 
         $data = collect($releases->items())->map(function ($release) {
             return $this->formatReleaseData($release);
+            return [
+                'id' => (string) $release->id,
+                'title' => $release->title,
+                'short_description' => Str::limit(strip_tags($release->description ?? ''), 160),
+                'description' => $release->description,
+                'author' => $release->author ?? 'Admin',
+                'published_date' => optional($release->created_at)->toDateString(),
+                'image' => $release->image ? url('storage/' . $release->image) : null,
+                'category' => $release->category ? $release->category->name : null,
+                'file_path' => $release->file_path ? url('storage/' . $release->file_path) : null,
+                'excel_path' => $release->excel_path ? url('storage/' . $release->excel_path) : null,
+                'powerbi_path' => $release->powerbi_path ? url('storage/' . $release->powerbi_path) : null,
+            ];
         });
 
         return response()->json([
@@ -58,6 +71,19 @@ class ReleaseController extends Controller
         return response()->json([
             'success' => true,
             'data' => $this->formatReleaseData($release),
+            'data' => [
+                'id' => (string) $release->id,
+                'title' => $release->title,
+                'short_description' => Str::limit(strip_tags($release->description ?? ''), 160),
+                'description' => $release->description,
+                'author' => $release->author ?? 'Admin',
+                'published_date' => optional($release->created_at)->toDateString(),
+                'image' => $release->image ? url('storage/' . $release->image) : null,
+                'category' => $release->category ? $release->category->name : null,
+                'file_path' => $release->file_path ? url('storage/' . $release->file_path) : null,
+                'excel_path' => $release->excel_path ? url('storage/' . $release->excel_path) : null,
+                'powerbi_path' => $release->powerbi_path ? url('storage/' . $release->powerbi_path) : null,
+            ],
         ]);
     }
 

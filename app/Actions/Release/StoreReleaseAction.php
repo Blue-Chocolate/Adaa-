@@ -12,6 +12,10 @@ class StoreReleaseAction
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+<<<<<<< HEAD
+=======
+            'author' => 'nullable|string|max:100',
+>>>>>>> 9c5c4c6054b3c65e0c21436b91905e171dfd35a8
             'release_category_id' => 'required|exists:releases_categories,id',
 
             'file' => 'nullable|file|mimes:pdf|max:20480',

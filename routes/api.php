@@ -297,8 +297,11 @@ Route::prefix('blogscategories')->group(function () {
 
 use App\Http\Controllers\Api\SearchController\SearchController;
 
-Route::get('/search', [SearchController::class, 'search']);
-
+Route::prefix('search')->group(function () {
+    Route::get('/blogs', [SearchController::class, 'searchBlogs']);
+    Route::get('/releases', [SearchController::class, 'searchReleases']);
+    Route::get('/all', [SearchController::class, 'searchAll']);
+});
 use App\Http\Controllers\Api\ReleasesCategoryController\ReleasesCategoryController;
 
 Route::prefix('releasescategory')->group(function () {

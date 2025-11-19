@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Repositories;
 
 use App\Models\Blog;
@@ -8,7 +7,7 @@ use App\Models\Release;
 class SearchRepository
 {
     /**
-     * Advanced search: blogs + releases by string OR category, with pagination
+     * Search blogs by string OR category, with pagination
      *
      * @param string|null $q
      * @param string|null $categoryName
@@ -16,11 +15,11 @@ class SearchRepository
      * @param int $page
      * @return array
      */
-    public function searchContentAdvanced(?string $q, ?string $categoryName, int $limit = 10, int $page = 1): array
+    public function searchBlogs(?string $q, ?string $categoryName, int $limit = 10, int $page = 1): array
     {
-        // 1️⃣ Blogs query
-        $blogsQuery = Blog::query();
-        $blogsQuery->where(function ($subQuery) use ($q, $categoryName) {
+        $query = Blog::query();
+        
+        $query->where(function ($subQuery) use ($q, $categoryName) {
             if ($categoryName) {
                 $subQuery->orWhereHas('category', function ($catQuery) use ($categoryName) {
                     $catQuery->where('name', 'like', "%{$categoryName}%");
@@ -33,9 +32,32 @@ class SearchRepository
             }
         });
 
-        // 2️⃣ Releases query
-        $releasesQuery = Release::query();
-        $releasesQuery->where(function ($subQuery) use ($q, $categoryName) {
+        $total = $query->count();
+        $items = $query->forPage($page, $limit)->get();
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'per_page' => $limit,
+            'current_page' => $page,
+            'last_page' => ceil($total / $limit),
+        ];
+    }
+
+    /**
+     * Search releases by string OR category, with pagination
+     *
+     * @param string|null $q
+     * @param string|null $categoryName
+     * @param int $limit
+     * @param int $page
+     * @return array
+     */
+    public function searchReleases(?string $q, ?string $categoryName, int $limit = 10, int $page = 1): array
+    {
+        $query = Release::query();
+        
+        $query->where(function ($subQuery) use ($q, $categoryName) {
             if ($categoryName) {
                 $subQuery->orWhereHas('category', function ($catQuery) use ($categoryName) {
                     $catQuery->where('name', 'like', "%{$categoryName}%");
@@ -47,12 +69,8 @@ class SearchRepository
             }
         });
 
-        // 3️⃣ Merge results
-        $merged = $blogsQuery->get()->concat($releasesQuery->get());
-
-        // 4️⃣ Paginate manually
-        $total = $merged->count();
-        $items = $merged->forPage($page, $limit)->values();
+        $total = $query->count();
+        $items = $query->forPage($page, $limit)->get();
 
         return [
             'items' => $items,
@@ -60,6 +78,27 @@ class SearchRepository
             'per_page' => $limit,
             'current_page' => $page,
             'last_page' => ceil($total / $limit),
+        ];
+    }
+
+    /**
+     * Search both blogs and releases (combined results)
+     *
+     * @param string|null $q
+     * @param string|null $categoryName
+     * @param int $limit
+     * @param int $page
+     * @return array
+     */
+    public function searchAll(?string $q, ?string $categoryName, int $limit = 10, int $page = 1): array
+    {
+        $blogs = $this->searchBlogs($q, $categoryName, $limit, $page);
+        $releases = $this->searchReleases($q, $categoryName, $limit, $page);
+
+        return [
+            'blogs' => $blogs,
+            'releases' => $releases,
+            'total_all' => $blogs['total'] + $releases['total'],
         ];
     }
 
