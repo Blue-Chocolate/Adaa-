@@ -2084,6 +2084,234 @@ POST /api/certificates/{path}/answers
 Content-Type: multipart/form-data OR application/json
 ```
 
+POST api/certificates/strategic/submit
+{
+  "answers": [
+    {
+      "question_id": 1,
+      "selected_option": "قبل شهر 3",
+      "attachment_url": "http://example.com/strategic/report.pdf"
+    },
+    {
+      "question_id": 2,
+      "selected_option": "من 86 - 100",
+      "attachment_url": "http://example.com/strategic/governance.pdf"
+    },
+    {
+      "question_id": 3,
+      "selected_option": "من 86 - 100%",
+      "attachment_url": "http://example.com/strategic/performance.pdf"
+    },
+    {
+      "question_id": 4,
+      "selected_option": "تم النشر",
+      "attachment_url": "http://example.com/strategic/sustainability.pdf"
+    },
+    {
+      "question_id": 5,
+      "selected_option": "تم النشر",
+      "attachment_url": "http://example.com/strategic/impact.pdf"
+    }
+  ]
+}
+
+POST /api/certificates/operational/submit
+
+{
+  "answers": [
+    {
+      "question_id": 6,
+      "selected_option": "قبل شهر 3",
+      "attachment_url": "http://example.com/strategic/report.pdf"
+    },
+    {
+      "question_id": 7,
+      "selected_option": "من 86 - 100",
+      "attachment_url": "http://example.com/strategic/governance.pdf"
+    },
+    {
+      "question_id": 8,
+      "selected_option": "من 86 - 100%",
+      "attachment_url": "http://example.com/strategic/performance.pdf"
+    }
+}
+]
+
+POST /api/certificates/hr/submit 
+
+{
+  "answers": [
+    {
+      "question_id": 9,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/organizational-structure.pdf"
+    },
+    {
+      "question_id": 10,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/job-descriptions.pdf"
+    },
+    {
+      "question_id": 11,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/workforce-planning.pdf"
+    },
+    {
+      "question_id": 12,
+      "selected_option": "مطبق بالكامل وموثق"
+    },
+    {
+      "question_id": 13,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/structure-review.pdf"
+    },
+    {
+      "question_id": 14,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/recruitment-policy.pdf"
+    },
+    {
+      "question_id": 15,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/hiring-criteria.pdf"
+    },
+    {
+      "question_id": 16,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/job-posting.pdf"
+    },
+    {
+      "question_id": 17,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/assessment-tools.pdf"
+    },
+    {
+      "question_id": 18,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/recruitment-records.pdf"
+    },
+    {
+      "question_id": 19,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/training-plan.pdf"
+    },
+    {
+      "question_id": 20,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/training-impact.pdf"
+    },
+    {
+      "question_id": 21,
+      "selected_option": "مطبق بالكامل وموثق"
+    },
+    {
+      "question_id": 22,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/training-documentation.pdf"
+    },
+    {
+      "question_id": 23,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/training-budget.pdf"
+    },
+    {
+      "question_id": 24,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/performance-system.pdf"
+    },
+    {
+      "question_id": 25,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/performance-rewards.pdf"
+    },
+    {
+      "question_id": 26,
+      "selected_option": "مطبق جزئياً"
+    },
+    {
+      "question_id": 27,
+      "selected_option": "مطبق بالكامل وموثق"
+    },
+    {
+      "question_id": 28,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/performance-analysis.pdf"
+    },
+    {
+      "question_id": 29,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/salary-scale.pdf"
+    },
+    {
+      "question_id": 30,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/incentives-criteria.pdf"
+    },
+    {
+      "question_id": 31,
+      "selected_option": "مطبق بالكامل وموثق"
+    },
+    {
+      "question_id": 32,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/salary-review.pdf"
+    },
+    {
+      "question_id": 33,
+      "selected_option": "مطبق بالكامل وموثق"
+    },
+    {
+      "question_id": 34,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/work-environment.pdf"
+    },
+    {
+      "question_id": 35,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/satisfaction-survey.pdf"
+    },
+    {
+      "question_id": 36,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/communication-channels.pdf"
+    },
+    {
+      "question_id": 37,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/innovation-program.pdf"
+    },
+    {
+      "question_id": 38,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/employee-belonging.pdf"
+    },
+    {
+      "question_id": 39,
+      "selected_option": "مطبق بالكامل وموثق"
+    },
+    {
+      "question_id": 40,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/social-insurance.pdf"
+    },
+    {
+      "question_id": 41,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/compliance-mechanisms.pdf"
+    },
+    {
+      "question_id": 42,
+      "selected_option": "مطبق جزئياً",
+      "attachment_url": "http://example.com/hr/policy-training.pdf"
+    },
+    {
+      "question_id": 43,
+      "selected_option": "مطبق بالكامل وموثق",
+      "attachment_url": "http://example.com/hr/compliance-records.pdf"
+    }
+  ]
+}
+
 **Request Body (with file upload):**
 ```json
 {

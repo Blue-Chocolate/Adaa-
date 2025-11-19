@@ -1,25 +1,25 @@
-<?php  
+<?php
 
-namespace App\Http\Controllers\Api\BlogsCategoriesController;
+namespace App\Http\Controllers\Api\ReleasesCategoryController;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Repositories\BlogsCategoriesRepository;
+use App\Repositories\ReleasesCategoryRepository;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
-class BlogsCategoriesController extends Controller
+class ReleasesCategoryController extends Controller
 {
     protected $repo;
 
-    public function __construct(BlogsCategoriesRepository $repo)
+    public function __construct(ReleasesCategoryRepository $repo)
     {
         $this->repo = $repo;
     }
 
-    // GET blogscategories?limit=15
+    // GET /releasescategory?limit=15
     public function index(Request $request)
     {
         try {
@@ -38,37 +38,35 @@ class BlogsCategoriesController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid query parameters',
+                'message' => 'Invalid limit value',
                 'errors' => $e->errors()
             ], 422);
 
         } catch (Exception $e) {
 
-            Log::error('BlogsCategories index error: ' . $e->getMessage());
+            Log::error('Error fetching release categories: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Something went wrong'
+                'message' => 'Server Error'
             ], 500);
         }
     }
 
-    // GET blogscategories/{id}
+    // GET /releasescategory/{id}
     public function show($id)
     {
         try {
-            $category = $this->repo->findById($id);
-
             return response()->json([
                 'success' => true,
-                'data' => $category
+                'data' => $this->repo->findById($id)
             ]);
 
         } catch (ModelNotFoundException $e) {
 
             return response()->json([
                 'success' => false,
-                'message' => 'Category not found'
+                'message' => 'Release category not found'
             ], 404);
 
         } catch (Exception $e) {
@@ -82,8 +80,8 @@ class BlogsCategoriesController extends Controller
         }
     }
 
-    // GET blogscategories/{id}/blogs?limit=20
-    public function blogs(Request $request, $categoryId)
+    // GET /releasescategory/{id}/releases?limit=20
+    public function releases(Request $request, $id)
     {
         try {
             $request->validate([
@@ -92,31 +90,21 @@ class BlogsCategoriesController extends Controller
 
             $limit = $request->query('limit', 10);
 
-            $blogs = $this->repo->getBlogsByCategory($categoryId, $limit);
-
             return response()->json([
                 'success' => true,
-                'data' => $blogs
+                'data' => $this->repo->getReleasesByCategory($id, $limit)
             ]);
-
-        } catch (ValidationException $e) {
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid limit value',
-                'errors' => $e->errors()
-            ], 422);
 
         } catch (ModelNotFoundException $e) {
 
             return response()->json([
                 'success' => false,
-                'message' => 'Category not found'
+                'message' => 'Release category not found'
             ], 404);
 
         } catch (Exception $e) {
 
-            Log::error("Error fetching blogs for category $categoryId: " . $e->getMessage());
+            Log::error("Error fetching releases for category $id: " . $e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -125,27 +113,25 @@ class BlogsCategoriesController extends Controller
         }
     }
 
-    // GET blogscategories/{id}/blogs/{blogId}
-    public function showBlog($categoryId, $blogId)
+    // GET /releasescategory/{id}/releases/{releaseId}
+    public function release($categoryId, $releaseId)
     {
         try {
-            $blog = $this->repo->getSpecificBlogInCategory($categoryId, $blogId);
-
             return response()->json([
                 'success' => true,
-                'data' => $blog
+                'data' => $this->repo->getSpecificReleaseInCategory($categoryId, $releaseId)
             ]);
 
         } catch (ModelNotFoundException $e) {
 
             return response()->json([
                 'success' => false,
-                'message' => 'Blog not found in this category'
+                'message' => 'Release not found in this category'
             ], 404);
 
         } catch (Exception $e) {
 
-            Log::error("Error fetching blog $blogId in category $categoryId: " . $e->getMessage());
+            Log::error("Error fetching release $releaseId in category $categoryId: " . $e->getMessage());
 
             return response()->json([
                 'success' => false,

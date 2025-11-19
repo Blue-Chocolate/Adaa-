@@ -139,32 +139,66 @@ Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('shield')->
 });
 
 use App\Http\Controllers\Api\CertificateController\CertificateSummaryController;
-Route::middleware(['auth:sanctum'])->prefix('certificates')->group(function () {
+// Route::middleware(['auth:sanctum'])->prefix('certificates')->group(function () {
+    
+//     // ➊ Get questions by path
+//     Route::get('/{path}/questions', [CertificateController::class, 'getQuestionsByPath']);
+    
+//     // ➋ Save answers (with file upload or URL)
+//     Route::post('/{path}/answers', [CertificateController::class, 'saveAnswers']);
+    
+//     // ➌ Submit certificate for a path
+//     Route::post('/{path}/submit', [CertificateController::class, 'submitCertificate']);
+    
+//     // ➏ Bulk upload answers (JSON with URLs)
+//     Route::post('/{path}/upload-answers', [CertificateController::class, 'uploadAnswers']);
+    
+//     // ➐ Download path data
+//     Route::get('/{path}/download', [CertificateController::class, 'downloadPath']);
+    
+//     // ➑ Download overall data (all paths)
+//     Route::get('/download', [CertificateController::class, 'downloadOverall']);
+    
+//     // ➒ Get user summary
+//     Route::get('/summary', [CertificateSummaryController::class, 'summary']);
+    
+//     // ➓ Upload file only (get URL back)
+//     Route::post('/{path}/upload', [CertificateController::class, 'uploadFile']);
+// });
+   
+use App\Http\Controllers\Api\CertificateController\CertificateQuestionController;
+use App\Http\Controllers\Api\CertificateController\CertificateAnswerController;
+use App\Http\Controllers\Api\CertificateController\CertificateSubmissionController;
+use App\Http\Controllers\Api\CertificateController\CertificateDownloadController;
+use App\Http\Controllers\Api\CertificateController\CertificateFileController;
+
+Route::middleware(['auth:sanctum','organization.approved'])->prefix('certificates')->group(function () {
     
     // ➊ Get questions by path
-    Route::get('/{path}/questions', [CertificateController::class, 'getQuestionsByPath']);
+    Route::get('/{path}/questions', [CertificateQuestionController::class, 'getQuestionsByPath']);
     
     // ➋ Save answers (with file upload or URL)
-    Route::post('/{path}/answers', [CertificateController::class, 'saveAnswers']);
+    Route::post('/{path}/save', [CertificateAnswerController::class, 'saveAnswers']);
     
     // ➌ Submit certificate for a path
-    Route::post('/{path}/submit', [CertificateController::class, 'submitCertificate']);
+    Route::post('/{path}/submit', [CertificateSubmissionController::class, 'submitCertificate']);
     
     // ➏ Bulk upload answers (JSON with URLs)
-    Route::post('/{path}/upload-answers', [CertificateController::class, 'uploadAnswers']);
+    Route::post('/{path}/upload-answers', [CertificateAnswerController::class, 'uploadAnswers']);
     
     // ➐ Download path data
-    Route::get('/{path}/download', [CertificateController::class, 'downloadPath']);
+    Route::get('/{path}/download', [CertificateDownloadController::class, 'downloadPath']);
     
     // ➑ Download overall data (all paths)
-    Route::get('/download', [CertificateController::class, 'downloadOverall']);
+    Route::get('/download', [CertificateDownloadController::class, 'downloadOverall']);
     
     // ➒ Get user summary
     Route::get('/summary', [CertificateSummaryController::class, 'summary']);
     
     // ➓ Upload file only (get URL back)
-    Route::post('/{path}/upload', [CertificateController::class, 'uploadFile']);
+    Route::post('/{path}/upload', [CertificateFileController::class, 'uploadFile']);
 });
+
     Route::get('/analytics', [CertificateController::class, 'analytics']);
     
     // ➎ Get all registered organizations
@@ -254,8 +288,7 @@ Route::post('/care-requests', [CareRequestController::class, 'store']);
 
 use App\Http\Controllers\Api\BlogsCategoriesController\BlogsCategoriesController;
 
-Route::prefix('blogscateogries')->group(function () {
-
+Route::prefix('blogscategories')->group(function () {
     Route::get('/', [BlogsCategoriesController::class, 'index']);
     Route::get('/{id}', [BlogsCategoriesController::class, 'show']);
 
@@ -266,3 +299,20 @@ Route::prefix('blogscateogries')->group(function () {
 use App\Http\Controllers\Api\SearchController\SearchController;
 
 Route::get('/search', [SearchController::class, 'search']);
+
+use App\Http\Controllers\Api\ReleasesCategoryController\ReleasesCategoryController;
+
+Route::prefix('releasescategory')->group(function () {
+
+    Route::get('/', [ReleasesCategoryController::class, 'index']);
+
+    Route::get('/{id}', [ReleasesCategoryController::class, 'show'])
+        ->whereNumber('id');
+
+    Route::get('/{id}/releases', [ReleasesCategoryController::class, 'releases'])
+        ->whereNumber('id');
+
+    Route::get('/{id}/releases/{releaseId}', [ReleasesCategoryController::class, 'release'])
+        ->whereNumber('id')
+        ->whereNumber('releaseId');
+});

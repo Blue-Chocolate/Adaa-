@@ -19,6 +19,7 @@ return new class extends Migration
     $table->string('powerbi_path')->nullable();
     $table->text('description')->nullable();
     $table->string('image', 255)->nullable();
+    $table->foreignId('release_category_id')->constrained('releases_categories')->onDelete('cascade');
     $table->timestamps();
 });
 
