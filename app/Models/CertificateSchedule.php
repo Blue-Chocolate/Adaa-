@@ -24,4 +24,15 @@ class CertificateSchedule extends Model
         'awarding_end_date',
         'awarding_note',
     ];
+
+    protected $casts = [
+        'submission_start_date' => 'date',
+        'submission_end_date' => 'date',
+        'submission_end_date_only' => 'date',
+        'evaluation_start_date' => 'date',
+        'evaluation_end_date' => 'date',
+        'announcement_date' => 'date',
+        'awarding_start_date' => 'date',
+        'awarding_end_date' => 'date',
+    ];
 }

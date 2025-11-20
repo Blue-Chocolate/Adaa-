@@ -23,14 +23,14 @@ class PasswordResetService
             $user = User::where('email', $email)->first();
 
             if (!$user) {
-                // Don't reveal whether the email exists for security
+                // Security: Don't reveal if email exists
                 return [
                     'success' => true,
                     'message' => 'If your email exists in our system, you will receive a password reset link shortly.'
                 ];
             }
 
-            // Check rate limiting (prevent spam)
+            // Rate limit check
             $recentReset = DB::table('password_reset_tokens')
                 ->where('email', $email)
                 ->first();
@@ -40,36 +40,42 @@ class PasswordResetService
                 $minutesSinceLastSent = now()->diffInMinutes($lastSent);
                 
                 if ($minutesSinceLastSent < 2) {
+                    Log::warning('Password reset rate limit hit', [
+                        'email' => $email,
+                        'minutes_since_last' => $minutesSinceLastSent
+                    ]);
+                    
                     return [
                         'success' => false,
-                        'message' => 'Please wait before requesting another password reset email'
+                        'message' => 'Please wait before requesting another password reset email',
+                        'retry_after' => 2 - $minutesSinceLastSent
                     ];
                 }
             }
 
-            // Generate unique token
+            // Generate new token (plain text to send via email)
             $token = Str::random(64);
 
-            // Store token in database (delete old tokens first)
-            DB::table('password_reset_tokens')
-                ->where('email', $email)
-                ->delete();
+            // Remove old tokens
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
 
+            // Store hashed version in database
             DB::table('password_reset_tokens')->insert([
                 'email' => $email,
-                'token' => Hash::make($token),
+                'token' => Hash::make($token), // Hash the token for storage
                 'created_at' => now()
             ]);
 
-            // Generate reset URL
-            $resetUrl = url("/api/password/reset?token={$token}&email={$email}");
+            // Build reset URL with plain token
+            $resetUrl = "https://blueviolet-gerbil-246756.hostingersite.com/rest-password?token={$token}&email=" . urlencode($email);
 
-            // Send email
+            // Send email with plain token
             Mail::to($user->email)->send(new PasswordResetEmail($user, $resetUrl, $token));
 
-            Log::info('Password reset email sent', [
+            Log::info('Password reset email sent successfully', [
                 'user_id' => $user->id,
-                'email' => $user->email
+                'email' => $user->email,
+                'token_length' => strlen($token)
             ]);
 
             return [
@@ -80,7 +86,10 @@ class PasswordResetService
         } catch (Exception $e) {
             Log::error('Failed to send password reset email', [
                 'email' => $email,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return [
@@ -97,43 +106,68 @@ class PasswordResetService
     public function resetPassword(string $email, string $token, string $newPassword): array
     {
         try {
+            Log::info('Password reset attempt', [
+                'email' => $email,
+                'token_length' => strlen($token)
+            ]);
+
+            // Find user
             $user = User::where('email', $email)->first();
 
             if (!$user) {
+                Log::warning('Password reset failed - user not found', ['email' => $email]);
+                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token or email'
                 ];
             }
 
-            // Find token record
+            // Find reset record
             $resetRecord = DB::table('password_reset_tokens')
                 ->where('email', $email)
                 ->first();
 
             if (!$resetRecord) {
+                Log::warning('Password reset failed - no token record', [
+                    'email' => $email,
+                    'user_id' => $user->id
+                ]);
+                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token or email'
                 ];
             }
 
-            // Verify token
+            // Verify token (plain text token vs hashed stored token)
             if (!Hash::check($token, $resetRecord->token)) {
+                Log::warning('Password reset failed - invalid token', [
+                    'email' => $email,
+                    'user_id' => $user->id,
+                    'provided_token_length' => strlen($token),
+                    'stored_token_length' => strlen($resetRecord->token)
+                ]);
+                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token'
                 ];
             }
 
-            // Check token expiration (60 minutes)
+            // Check expiration (60 minutes)
             $expiresAt = Carbon::parse($resetRecord->created_at)->addMinutes(60);
             
             if (now()->greaterThan($expiresAt)) {
-                // Delete expired token
-                DB::table('password_reset_tokens')
-                    ->where('email', $email)
-                    ->delete();
+                Log::warning('Password reset failed - token expired', [
+                    'email' => $email,
+                    'user_id' => $user->id,
+                    'created_at' => $resetRecord->created_at,
+                    'expires_at' => $expiresAt
+                ]);
+                
+                // Clean up expired token
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
 
                 return [
                     'success' => false,
@@ -147,14 +181,12 @@ class PasswordResetService
             ]);
 
             // Delete used token
-            DB::table('password_reset_tokens')
-                ->where('email', $email)
-                ->delete();
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
 
-            // Revoke all existing tokens (force re-login)
+            // Revoke all tokens (force logout from all devices)
             $user->tokens()->delete();
 
-            Log::info('Password reset successfully', [
+            Log::info('Password reset completed successfully', [
                 'user_id' => $user->id,
                 'email' => $user->email
             ]);
@@ -168,6 +200,8 @@ class PasswordResetService
             Log::error('Password reset error', [
                 'email' => $email,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 
@@ -180,16 +214,24 @@ class PasswordResetService
     }
 
     /**
-     * Verify if reset token is valid
+     * Verify reset token validity
      */
     public function verifyResetToken(string $email, string $token): array
     {
         try {
+            Log::info('Token verification attempt', [
+                'email' => $email,
+                'token_length' => strlen($token)
+            ]);
+
+            // Find reset record
             $resetRecord = DB::table('password_reset_tokens')
                 ->where('email', $email)
                 ->first();
 
             if (!$resetRecord) {
+                Log::warning('Token verification failed - no record found', ['email' => $email]);
+                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token'
@@ -198,6 +240,8 @@ class PasswordResetService
 
             // Verify token
             if (!Hash::check($token, $resetRecord->token)) {
+                Log::warning('Token verification failed - invalid token', ['email' => $email]);
+                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token'
@@ -208,26 +252,45 @@ class PasswordResetService
             $expiresAt = Carbon::parse($resetRecord->created_at)->addMinutes(60);
             
             if (now()->greaterThan($expiresAt)) {
+                Log::warning('Token verification failed - expired', [
+                    'email' => $email,
+                    'expires_at' => $expiresAt
+                ]);
+                
+                // Clean up expired token
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
+                
                 return [
                     'success' => false,
                     'message' => 'Token has expired'
                 ];
             }
 
+            $remainingMinutes = now()->diffInMinutes($expiresAt);
+            
+            Log::info('Token verification successful', [
+                'email' => $email,
+                'remaining_minutes' => $remainingMinutes
+            ]);
+
             return [
                 'success' => true,
-                'message' => 'Token is valid'
+                'message' => 'Token is valid',
+                'expires_in_minutes' => $remainingMinutes
             ];
 
         } catch (Exception $e) {
             Log::error('Token verification error', [
                 'email' => $email,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ]);
 
             return [
                 'success' => false,
-                'message' => 'Token verification failed'
+                'message' => 'Token verification failed',
+                'error' => config('app.debug') ? $e->getMessage() : null
             ];
         }
     }
