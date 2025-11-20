@@ -41,6 +41,14 @@ class CertificateDownloadController extends Controller
             ], 404);
         }
 
+        // Check if the specific path is approved
+        if (!$this->isPathApproved($organization, $path)) {
+            return response()->json([
+                'success' => false,
+                'message' => "The {$path} certificate has not been approved yet. Please wait for admin approval."
+            ], 403);
+        }
+
         try {
             $data = $this->repo->downloadPathData($organization->id, $path);
 
@@ -70,12 +78,24 @@ class CertificateDownloadController extends Controller
             ], 404);
         }
 
+        // Check if at least one path is approved
+        $approvedPaths = $this->getApprovedPaths($organization);
+        
+        if (empty($approvedPaths)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No certificates have been approved yet. Please wait for admin approval.'
+            ], 403);
+        }
+
         try {
-            $data = $this->repo->downloadOverallData($organization->id);
+            // Pass approved paths to repository so it only includes approved data
+            $data = $this->repo->downloadOverallData($organization->id, $approvedPaths);
 
             return response()->json([
                 'success' => true,
-                'data' => $data
+                'data' => $data,
+                'approved_paths' => $approvedPaths
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -91,5 +111,30 @@ class CertificateDownloadController extends Controller
     private function isValidPath(string $path): bool
     {
         return in_array($path, self::VALID_PATHS);
+    }
+
+    /**
+     * Check if a specific path is approved for the organization
+     */
+    private function isPathApproved($organization, string $path): bool
+    {
+        $approvalField = "certificate_{$path}_approved";
+        return $organization->{$approvalField} === true;
+    }
+
+    /**
+     * Get all approved paths for the organization
+     */
+    private function getApprovedPaths($organization): array
+    {
+        $approved = [];
+        
+        foreach (self::VALID_PATHS as $path) {
+            if ($this->isPathApproved($organization, $path)) {
+                $approved[] = $path;
+            }
+        }
+        
+        return $approved;
     }
 }

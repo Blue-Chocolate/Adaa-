@@ -29,12 +29,33 @@ class PasswordResetController extends Controller
         try {
             $result = $this->resetService->sendResetLink($request->validated()['email']);
 
+            // Log the full result for debugging
+            Log::info('Forgot password result', [
+                'email' => $request->validated()['email'],
+                'result' => $result
+            ]);
+
+            // Check if result is valid
+            if (!is_array($result) || !isset($result['success'])) {
+                Log::error('Invalid result structure from sendResetLink', [
+                    'result' => $result,
+                    'type' => gettype($result)
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid response from password reset service'
+                ], 500);
+            }
+
             return response()->json($result, $result['success'] ? 200 : 400);
 
         } catch (Exception $e) {
             Log::error('Forgot password failed', [
                 'error' => $e->getMessage(),
-                'email' => $request->email,
+                'email' => $request->validated()['email'],
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 
@@ -61,12 +82,44 @@ class PasswordResetController extends Controller
                 $validated['password']
             );
 
+            // Log the full result for debugging
+            Log::info('Password reset result', [
+                'email' => $validated['email'],
+                'result' => $result,
+                'result_type' => gettype($result),
+                'has_success_key' => isset($result['success']) ? 'yes' : 'no'
+            ]);
+
+            // Check if result is valid
+            if (!is_array($result) || !isset($result['success'])) {
+                Log::error('Invalid result structure from resetPassword', [
+                    'result' => $result,
+                    'type' => gettype($result)
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid response from password reset service',
+                    'debug' => config('app.debug') ? $result : null
+                ], 500);
+            }
+
+            // Log when unsuccessful
+            if (!$result['success']) {
+                Log::warning('Password reset unsuccessful', [
+                    'email' => $validated['email'],
+                    'result' => $result
+                ]);
+            }
+
             return response()->json($result, $result['success'] ? 200 : 400);
 
         } catch (Exception $e) {
             Log::error('Password reset failed', [
                 'error' => $e->getMessage(),
-                'email' => $request->email,
+                'email' => $request->validated()['email'],
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 
@@ -97,11 +150,32 @@ class PasswordResetController extends Controller
 
             $result = $this->resetService->verifyResetToken($email, $token);
 
+            // Log the verification result
+            Log::info('Token verification result', [
+                'email' => $email,
+                'result' => $result
+            ]);
+
+            // Check if result is valid
+            if (!is_array($result) || !isset($result['success'])) {
+                Log::error('Invalid result structure from verifyResetToken', [
+                    'result' => $result,
+                    'type' => gettype($result)
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid response from token verification service'
+                ], 500);
+            }
+
             return response()->json($result, $result['success'] ? 200 : 400);
 
         } catch (Exception $e) {
             Log::error('Token verification failed', [
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 

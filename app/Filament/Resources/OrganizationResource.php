@@ -79,15 +79,22 @@ class OrganizationResource extends Resource
                             ->maxLength(20)
                             ->columnSpan(1),
 
-                        Forms\Components\Textarea::make('address')
-                            ->label('Address')
-                            ->maxLength(500)
-                            ->rows(3)
-                            ->columnSpanFull(),
+                        Forms\Components\TextInput::make('website')
+                            ->label('Website')
+                            ->url()
+                            ->maxLength(255)
+                            ->columnSpan(1)
+                            ->prefix('https://'),
 
                         Forms\Components\TextInput::make('license_number')
                             ->label('License Number')
                             ->maxLength(100)
+                            ->columnSpan(1),
+
+                        Forms\Components\Textarea::make('address')
+                            ->label('Address')
+                            ->maxLength(500)
+                            ->rows(3)
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
@@ -134,26 +141,86 @@ class OrganizationResource extends Resource
 
                 Forms\Components\Section::make('Certificate Tracking')
                     ->schema([
-                        Forms\Components\TextInput::make('certificate_final_score')
-                            ->label('Final Score')
-                            ->numeric()
-                            ->minValue(0)
-                            ->maxValue(100)
-                            ->suffix('%')
-                            ->columnSpan(1),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('certificate_final_score')
+                                    ->label('Final Score')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(100)
+                                    ->suffix('%'),
 
-                        Forms\Components\Select::make('certificate_final_rank')
-                            ->label('Final Rank')
-                            ->options([
-                                'bronze' => 'Bronze',
-                                'silver' => 'Silver',
-                                'gold' => 'Gold',
-                                'diamond' => 'Diamond',
+                                Forms\Components\Select::make('certificate_final_rank')
+                                    ->label('Final Rank')
+                                    ->options([
+                                        'bronze' => 'Bronze',
+                                        'silver' => 'Silver',
+                                        'gold' => 'Gold',
+                                        'diamond' => 'Diamond',
+                                    ])
+                                    ->native(false),
+                            ]),
+
+                        Forms\Components\Fieldset::make('Path Scores')
+                            ->schema([
+                                Forms\Components\TextInput::make('certificate_strategic_score')
+                                    ->label('Strategic Score')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(100)
+                                    ->suffix('%'),
+
+                                Forms\Components\TextInput::make('certificate_operational_score')
+                                    ->label('Operational Score')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(100)
+                                    ->suffix('%'),
+
+                                Forms\Components\TextInput::make('certificate_hr_score')
+                                    ->label('HR Score')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(100)
+                                    ->suffix('%'),
                             ])
-                            ->native(false)
-                            ->columnSpan(1),
+                            ->columns(3),
+
+                        Forms\Components\Fieldset::make('Submission Status')
+                            ->schema([
+                                Forms\Components\Toggle::make('certificate_strategic_submitted')
+                                    ->label('Strategic Submitted')
+                                    ->inline(false),
+
+                                Forms\Components\Toggle::make('certificate_operational_submitted')
+                                    ->label('Operational Submitted')
+                                    ->inline(false),
+
+                                Forms\Components\Toggle::make('certificate_hr_submitted')
+                                    ->label('HR Submitted')
+                                    ->inline(false),
+                            ])
+                            ->columns(3),
+
+                        Forms\Components\Fieldset::make('Approval Status')
+                            ->schema([
+                                Forms\Components\Toggle::make('certificate_strategic_approved')
+                                    ->label('Strategic Approved')
+                                    ->inline(false)
+                                    ->helperText('Admin approval for strategic path'),
+
+                                Forms\Components\Toggle::make('certificate_operational_approved')
+                                    ->label('Operational Approved')
+                                    ->inline(false)
+                                    ->helperText('Admin approval for operational path'),
+
+                                Forms\Components\Toggle::make('certificate_hr_approved')
+                                    ->label('HR Approved')
+                                    ->inline(false)
+                                    ->helperText('Admin approval for HR path'),
+                            ])
+                            ->columns(3),
                     ])
-                    ->columns(2)
                     ->collapsible(),
             ]);
     }
@@ -232,6 +299,33 @@ class OrganizationResource extends Resource
                     ])
                     ->toggleable(),
 
+                Tables\Columns\TextColumn::make('certificate_approvals')
+                    ->label('Approved Paths')
+                    ->getStateUsing(function (Organization $record): string {
+                        $approved = 0;
+                        $submitted = 0;
+
+                        if ($record->certificate_strategic_submitted) {
+                            $submitted++;
+                            if ($record->certificate_strategic_approved) $approved++;
+                        }
+                        if ($record->certificate_operational_submitted) {
+                            $submitted++;
+                            if ($record->certificate_operational_approved) $approved++;
+                        }
+                        if ($record->certificate_hr_submitted) {
+                            $submitted++;
+                            if ($record->certificate_hr_approved) $approved++;
+                        }
+
+                        return "{$approved}/{$submitted}";
+                    })
+                    ->badge()
+                    ->color(fn (Organization $record): string => 
+                        $record->allSubmittedCertificatesApproved() ? 'success' : 'warning'
+                    )
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('established_at')
                     ->label('Established')
                     ->date()
@@ -262,6 +356,23 @@ class OrganizationResource extends Resource
                         'diamond' => 'Diamond',
                     ])
                     ->multiple(),
+
+                Tables\Filters\Filter::make('certificate_approvals')
+                    ->label('Certificate Approvals')
+                    ->form([
+                        Forms\Components\Toggle::make('strategic_approved')
+                            ->label('Strategic Approved'),
+                        Forms\Components\Toggle::make('operational_approved')
+                            ->label('Operational Approved'),
+                        Forms\Components\Toggle::make('hr_approved')
+                            ->label('HR Approved'),
+                    ])
+                    ->query(function ($query, array $data) {
+                        return $query
+                            ->when($data['strategic_approved'], fn ($q) => $q->where('certificate_strategic_approved', true))
+                            ->when($data['operational_approved'], fn ($q) => $q->where('certificate_operational_approved', true))
+                            ->when($data['hr_approved'], fn ($q) => $q->where('certificate_hr_approved', true));
+                    }),
 
                 Tables\Filters\Filter::make('created_at')
                     ->form([
@@ -405,16 +516,26 @@ class OrganizationResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('email')
                             ->label('Email')
-                            ->copyable(),
+                            ->copyable()
+                            ->icon('heroicon-o-envelope'),
                         Infolists\Components\TextEntry::make('phone')
                             ->label('Phone')
-                            ->copyable(),
-                        Infolists\Components\TextEntry::make('address')
-                            ->label('Address')
-                            ->columnSpanFull(),
+                            ->copyable()
+                            ->icon('heroicon-o-phone'),
+                        Infolists\Components\TextEntry::make('website')
+                            ->label('Website')
+                            ->copyable()
+                            ->url(fn ($state) => $state)
+                            ->openUrlInNewTab()
+                            ->icon('heroicon-o-globe-alt'),
                         Infolists\Components\TextEntry::make('license_number')
                             ->label('License Number')
-                            ->copyable(),
+                            ->copyable()
+                            ->icon('heroicon-o-document-text'),
+                        Infolists\Components\TextEntry::make('address')
+                            ->label('Address')
+                            ->columnSpanFull()
+                            ->icon('heroicon-o-map-pin'),
                     ])
                     ->columns(2),
 
@@ -449,6 +570,101 @@ class OrganizationResource extends Resource
                     ])
                     ->columns(2),
 
+                Infolists\Components\Section::make('Certificate Path Scores')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('certificate_strategic_score')
+                            ->label('Strategic Score')
+                            ->suffix('%')
+                            ->placeholder('Not scored'),
+                        Infolists\Components\TextEntry::make('certificate_operational_score')
+                            ->label('Operational Score')
+                            ->suffix('%')
+                            ->placeholder('Not scored'),
+                        Infolists\Components\TextEntry::make('certificate_hr_score')
+                            ->label('HR Score')
+                            ->suffix('%')
+                            ->placeholder('Not scored'),
+                    ])
+                    ->columns(3)
+                    ->collapsible(),
+
+                Infolists\Components\Section::make('Certificate Submission & Approval Status')
+                    ->schema([
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('certificate_strategic_submitted')
+                                    ->label('Strategic Path')
+                                    ->badge()
+                                    ->getStateUsing(fn (Organization $record): string => 
+                                        $record->certificate_strategic_submitted ? 'Submitted' : 'Not Submitted'
+                                    )
+                                    ->color(fn (Organization $record): string => 
+                                        $record->certificate_strategic_submitted ? 'info' : 'gray'
+                                    ),
+                                
+                                Infolists\Components\TextEntry::make('certificate_operational_submitted')
+                                    ->label('Operational Path')
+                                    ->badge()
+                                    ->getStateUsing(fn (Organization $record): string => 
+                                        $record->certificate_operational_submitted ? 'Submitted' : 'Not Submitted'
+                                    )
+                                    ->color(fn (Organization $record): string => 
+                                        $record->certificate_operational_submitted ? 'info' : 'gray'
+                                    ),
+                                
+                                Infolists\Components\TextEntry::make('certificate_hr_submitted')
+                                    ->label('HR Path')
+                                    ->badge()
+                                    ->getStateUsing(fn (Organization $record): string => 
+                                        $record->certificate_hr_submitted ? 'Submitted' : 'Not Submitted'
+                                    )
+                                    ->color(fn (Organization $record): string => 
+                                        $record->certificate_hr_submitted ? 'info' : 'gray'
+                                    ),
+                            ]),
+
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('certificate_strategic_approved')
+                                    ->label('Strategic Approval')
+                                    ->badge()
+                                    ->getStateUsing(fn (Organization $record): string => 
+                                        $record->certificate_strategic_approved ? 'Approved' : 
+                                        ($record->certificate_strategic_submitted ? 'Pending' : 'N/A')
+                                    )
+                                    ->color(fn (Organization $record): string => 
+                                        $record->certificate_strategic_approved ? 'success' : 
+                                        ($record->certificate_strategic_submitted ? 'warning' : 'gray')
+                                    ),
+                                
+                                Infolists\Components\TextEntry::make('certificate_operational_approved')
+                                    ->label('Operational Approval')
+                                    ->badge()
+                                    ->getStateUsing(fn (Organization $record): string => 
+                                        $record->certificate_operational_approved ? 'Approved' : 
+                                        ($record->certificate_operational_submitted ? 'Pending' : 'N/A')
+                                    )
+                                    ->color(fn (Organization $record): string => 
+                                        $record->certificate_operational_approved ? 'success' : 
+                                        ($record->certificate_operational_submitted ? 'warning' : 'gray')
+                                    ),
+                                
+                                Infolists\Components\TextEntry::make('certificate_hr_approved')
+                                    ->label('HR Approval')
+                                    ->badge()
+                                    ->getStateUsing(fn (Organization $record): string => 
+                                        $record->certificate_hr_approved ? 'Approved' : 
+                                        ($record->certificate_hr_submitted ? 'Pending' : 'N/A')
+                                    )
+                                    ->color(fn (Organization $record): string => 
+                                        $record->certificate_hr_approved ? 'success' : 
+                                        ($record->certificate_hr_submitted ? 'warning' : 'gray')
+                                    ),
+                            ]),
+                    ])
+                    ->columns(1)
+                    ->collapsible(),
+
                 Infolists\Components\Section::make('Timestamps')
                     ->schema([
                         Infolists\Components\TextEntry::make('created_at')
@@ -470,6 +686,7 @@ class OrganizationResource extends Resource
             CertificateAnswersRelationManager::class,
         ];
     }
+
     public static function getPages(): array
     {
         return [

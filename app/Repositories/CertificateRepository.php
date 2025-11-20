@@ -236,10 +236,10 @@ class CertificateRepository
                 }
             }
 
-            // If all paths complete, calculate final rank
+            // If all paths complete, calculate final score and rank
             if ($completedPaths === count($validPaths)) {
                 $totalScore = array_sum($pathScores);
-                $rank = $this->calculateRank($totalScore);
+                $rank = $this->calculateOverallRank($totalScore);
                 
                 $organization->update([
                     'certificate_final_score' => $totalScore,
@@ -271,6 +271,7 @@ class CertificateRepository
             }
         });
     }
+    
     /**
      * 📊 Get analytics for all organizations
      */
@@ -452,9 +453,9 @@ class CertificateRepository
     }
 
     /**
-     * 🏆 Calculate rank based on total score across all paths
+     * 🏆 Calculate rank based on total score across all paths (using SUM)
      */
-    private function calculateRank(float $totalScore): string
+    private function calculateOverallRank(float $totalScore): string
     {
         // Calculate max possible score across all paths
         $maxScore = 0;
@@ -471,6 +472,31 @@ class CertificateRepository
         }
         
         $normalizedScore = ($maxScore > 0) ? ($totalScore / $maxScore) * 100 : 0;
+
+        return match (true) {
+            $normalizedScore >= 86 => 'diamond',
+            $normalizedScore >= 76 => 'gold',
+            $normalizedScore >= 66 => 'silver',
+            $normalizedScore >= 55 => 'bronze',
+            default => 'bronze',
+        };
+    }
+
+    /**
+     * 🏆 Calculate rank for a specific path
+     */
+    private function calculatePathRank(string $path, float $pathScore): string
+    {
+        // Calculate max possible score for this specific path
+        $maxScore = CertificateQuestion::where('path', $path)
+            ->get()
+            ->sum(function($question) {
+                $mapping = $question->points_mapping;
+                $maxPoints = is_array($mapping) ? max($mapping) : 0;
+                return $maxPoints * $question->weight;
+            });
+        
+        $normalizedScore = ($maxScore > 0) ? ($pathScore / $maxScore) * 100 : 0;
 
         return match (true) {
             $normalizedScore >= 86 => 'diamond',
@@ -564,146 +590,542 @@ class CertificateRepository
             ];
         });
     }
+    
     public function getAnalyticsTable(): array
-{
-    $validPaths = ['strategic', 'operational', 'hr'];
-    $pathNames = [
-        'strategic' => ['ar' => 'الأداء الاستراتيجي', 'en' => 'Strategic Performance'],
-        'operational' => ['ar' => 'الأداء التشغيلي', 'en' => 'Operational Performance'],
-        'hr' => ['ar' => 'الموارد البشرية', 'en' => 'Human Resources'],
-    ];
-    
-    $organizations = Organization::with(['certificateAnswers.question'])->get();
-    
-    $tableData = [];
-    
-    foreach ($organizations as $org) {
-        foreach ($validPaths as $path) {
-            // Calculate path completion
-            $totalQuestions = CertificateQuestion::where('path', $path)->count();
-            $answeredQuestions = $org->certificateAnswers()
-                ->whereHas('question', function($q) use ($path) {
-                    $q->where('path', $path);
+    {
+        $validPaths = ['strategic', 'operational', 'hr'];
+        $pathNames = [
+            'strategic' => ['ar' => 'الأداء الاستراتيجي', 'en' => 'Strategic Performance'],
+            'operational' => ['ar' => 'الأداء التشغيلي', 'en' => 'Operational Performance'],
+            'hr' => ['ar' => 'الموارد البشرية', 'en' => 'Human Resources'],
+        ];
+        
+        $organizations = Organization::with(['certificateAnswers.question'])->get();
+        
+        $tableData = [];
+        
+        foreach ($organizations as $org) {
+            foreach ($validPaths as $path) {
+                // Calculate path completion
+                $totalQuestions = CertificateQuestion::where('path', $path)->count();
+                $answeredQuestions = $org->certificateAnswers()
+                    ->whereHas('question', function($q) use ($path) {
+                        $q->where('path', $path);
+                    })
+                    ->count();
+                
+                $percentage = $totalQuestions > 0 
+                    ? round(($answeredQuestions / $totalQuestions) * 100) 
+                    : 0;
+                
+                // Get path-specific score and rank
+                $pathScore = $org->certificateAnswers()
+                    ->whereHas('question', function($q) use ($path) {
+                        $q->where('path', $path);
+                    })
+                    ->sum('final_points');
+                
+                // Calculate rank for this specific path
+                $pathRank = $this->calculatePathRank($path, $pathScore);
+                
+                // Check if path is submitted
+                $submittedColumn = "certificate_{$path}_submitted";
+                $isSubmitted = $org->$submittedColumn ?? false;
+                
+                $tableData[] = [
+                    'organization_id' => $org->id,
+                    'organization_name' => $org->name,
+                    'path' => $path,
+                    'path_name_ar' => $pathNames[$path]['ar'],
+                    'path_name_en' => $pathNames[$path]['en'],
+                    'percentage' => $percentage,
+                    'rank' => $pathRank,
+                    'rank_ar' => $this->getRankArabic($pathRank),
+                    'rank_icon' => $this->getRankIcon($pathRank),
+                    'rank_color' => $this->getRankColor($pathRank),
+                    'website' => $org->website,
+                    'email' => $org->email,
+                    'score' => $pathScore,
+                    'answered' => $answeredQuestions,
+                    'total' => $totalQuestions,
+                    'is_submitted' => $isSubmitted,
+                    'is_complete' => $percentage >= 100,
+                ];
+            }
+        }
+        
+        // Sort by percentage descending
+        usort($tableData, function($a, $b) {
+            return $b['percentage'] <=> $a['percentage'];
+        });
+        
+        return [
+            'total_entries' => count($tableData),
+            'total_organizations' => $organizations->count(),
+            'data' => $tableData,
+        ];
+    }
+
+    /**
+     * 🎨 Get rank icon (emoji or symbol)
+     */
+    private function getRankIcon(string $rank): string
+    {
+        return match($rank) {
+            'diamond' => '💎',
+            'gold' => '🥇',
+            'silver' => '🥈',
+            'bronze' => '🥉',
+            default => '⚪',
+        };
+    }
+
+    /**
+     * 📊 Get rank name in Arabic
+     */
+    private function getRankArabic(string $rank): string
+    {
+        return match($rank) {
+            'diamond' => 'شهادة ماسية',
+            'gold' => 'شهادة ذهبية',
+            'silver' => 'شهادة فضية',
+            'bronze' => 'شهادة برونزية',
+            default => 'بدون شهادة',
+        };
+    }
+
+    /**
+     * 🎨 Get rank color for UI
+     */
+    private function getRankColor(string $rank): string
+    {
+        return match($rank) {
+            'diamond' => '#B9F2FF',
+            'gold' => '#FFD700',
+            'silver' => '#C0C0C0',
+            'bronze' => '#CD7F32',
+            default => '#808080',
+        };
+    }
+
+    public function getAnalyticsTableApprovedOnly(): array
+    {
+        $organizations = Organization::with(['certificateAnswers.certificateQuestion'])
+            ->where('status', 'approved')
+            ->where(function($query) {
+                // Only get organizations that have at least one approved certificate path
+                $query->where('certificate_strategic_approved', true)
+                    ->orWhere('certificate_operational_approved', true)
+                    ->orWhere('certificate_hr_approved', true);
+            })
+            ->get();
+
+        $data = [];
+        $uniqueOrganizations = collect();
+
+        foreach ($organizations as $organization) {
+            // Process Strategic Path (only if approved)
+            if ($organization->certificate_strategic_approved) {
+                $strategicData = $this->getPathData($organization, 'strategic');
+                if ($strategicData) {
+                    $data[] = $strategicData;
+                    $uniqueOrganizations->push($organization->id);
+                }
+            }
+
+            // Process Operational Path (only if approved)
+            if ($organization->certificate_operational_approved) {
+                $operationalData = $this->getPathData($organization, 'operational');
+                if ($operationalData) {
+                    $data[] = $operationalData;
+                    $uniqueOrganizations->push($organization->id);
+                }
+            }
+
+            // Process HR Path (only if approved)
+            if ($organization->certificate_hr_approved) {
+                $hrData = $this->getPathData($organization, 'hr');
+                if ($hrData) {
+                    $data[] = $hrData;
+                    $uniqueOrganizations->push($organization->id);
+                }
+            }
+        }
+
+        return [
+            'total_organizations' => $uniqueOrganizations->unique()->count(),
+            'total_approved_paths' => count($data),
+            'data' => $data,
+        ];
+    }
+
+    /**
+     * Get path data for a specific organization and path
+     */
+    protected function getPathData(Organization $organization, string $path): ?array
+    {
+        $scoreField = "certificate_{$path}_score";
+        $score = $organization->$scoreField;
+
+        // Get answers for this path
+        $answers = $organization->certificateAnswers()
+            ->whereHas('certificateQuestion', function ($query) use ($path) {
+                $query->where('path', $path);
+            })
+            ->count();
+
+        // Get total questions for this path
+        $totalQuestions = CertificateQuestion::where('path', $path)->count();
+
+        // Calculate percentage
+        $percentage = $totalQuestions > 0 ? round(($answers / $totalQuestions) * 100, 2) : 0;
+        $isComplete = $answers >= $totalQuestions && $totalQuestions > 0;
+
+        // Determine rank based on score using the unified path rank calculation
+        $rank = $this->calculatePathRank($path, $score ?? 0);
+
+        return [
+            'organization_id' => $organization->id,
+            'organization_name' => $organization->name,
+            'path' => $path,
+            'path_label' => $this->getPathLabel($path),
+            'score' => $score ?? 0,
+            'rank' => $rank,
+            'percentage' => $percentage,
+            'answered_questions' => $answers,
+            'total_questions' => $totalQuestions,
+            'is_complete' => $isComplete,
+            'is_approved' => true,
+        ];
+    }
+
+    /**
+     * Get path label in Arabic
+     */
+    protected function getPathLabel(string $path): string
+    {
+        return match($path) {
+            'strategic' => 'المسار الاستراتيجي',
+            'operational' => 'المسار التشغيلي',
+            'hr' => 'مسار الموارد البشرية',
+            default => $path,
+        };
+    }
+
+    /**
+     * Get count of pending approvals by path
+     */
+    public function getPendingApprovalsCount(): array
+    {
+        $pending = [
+            'strategic' => Organization::where('certificate_strategic_submitted', true)
+                ->where('certificate_strategic_approved', false)
+                ->count(),
+            'operational' => Organization::where('certificate_operational_submitted', true)
+                ->where('certificate_operational_approved', false)
+                ->count(),
+            'hr' => Organization::where('certificate_hr_submitted', true)
+                ->where('certificate_hr_approved', false)
+                ->count(),
+        ];
+
+        $pending['total'] = $pending['strategic'] + $pending['operational'] + $pending['hr'];
+
+        return $pending;
+    }
+
+    /**
+     * Get organizations with pending certificate approvals
+     */
+    public function getOrganizationsWithPendingApprovals()
+    {
+        return Organization::where('status', 'approved')
+            ->where(function($query) {
+                $query->where(function($q) {
+                    // Strategic: submitted but not approved
+                    $q->where('certificate_strategic_submitted', true)
+                      ->where('certificate_strategic_approved', false);
                 })
-                ->count();
-            
-            $percentage = $totalQuestions > 0 
-                ? round(($answeredQuestions / $totalQuestions) * 100) 
-                : 0;
-            
-            // Get path-specific score and rank
-            $pathScore = $org->certificateAnswers()
-                ->whereHas('question', function($q) use ($path) {
-                    $q->where('path', $path);
+                ->orWhere(function($q) {
+                    // Operational: submitted but not approved
+                    $q->where('certificate_operational_submitted', true)
+                      ->where('certificate_operational_approved', false);
                 })
-                ->sum('final_points');
-            
-            // Calculate rank for this specific path
-            $pathRank = $this->calculatePathRank($path, $pathScore);
-            
-            // Check if path is submitted
-            $submittedColumn = "certificate_{$path}_submitted";
-            $isSubmitted = $org->$submittedColumn ?? false;
-            
-            $tableData[] = [
-                'organization_id' => $org->id,
-                'organization_name' => $org->name,
-                'path' => $path,
-                'path_name_ar' => $pathNames[$path]['ar'],
-                'path_name_en' => $pathNames[$path]['en'],
-                'percentage' => $percentage,
-                'rank' => $pathRank,
-                'rank_ar' => $this->getRankArabic($pathRank),
-                'rank_icon' => $this->getRankIcon($pathRank),
-                'rank_color' => $this->getRankColor($pathRank),
-                'website' => $org->website,
-                'email' => $org->email,
-                'score' => $pathScore,
-                'answered' => $answeredQuestions,
-                'total' => $totalQuestions,
-                'is_submitted' => $isSubmitted,
-                'is_complete' => $percentage >= 100,
-            ];
+                ->orWhere(function($q) {
+                    // HR: submitted but not approved
+                    $q->where('certificate_hr_submitted', true)
+                      ->where('certificate_hr_approved', false);
+                });
+            })
+            ->with(['user', 'certificateAnswers'])
+            ->get()
+            ->map(function($org) {
+                return [
+                    'id' => $org->id,
+                    'name' => $org->name,
+                    'owner' => $org->user->name ?? 'N/A',
+                    'pending_paths' => [
+                        'strategic' => $org->certificate_strategic_submitted && !$org->certificate_strategic_approved,
+                        'operational' => $org->certificate_operational_submitted && !$org->certificate_operational_approved,
+                        'hr' => $org->certificate_hr_submitted && !$org->certificate_hr_approved,
+                    ],
+                    'pending_count' => 
+                        ($org->certificate_strategic_submitted && !$org->certificate_strategic_approved ? 1 : 0) +
+                        ($org->certificate_operational_submitted && !$org->certificate_operational_approved ? 1 : 0) +
+                        ($org->certificate_hr_submitted && !$org->certificate_hr_approved ? 1 : 0),
+                ];
+            });
+    }
+
+    /**
+     * Approve a certificate path for an organization
+     */
+    public function approveCertificatePath(int $organizationId, string $path): bool
+    {
+        $organization = Organization::findOrFail($organizationId);
+        
+        $approvalField = "certificate_{$path}_approved";
+        $submittedField = "certificate_{$path}_submitted";
+        
+        // Check if it was submitted
+        if (!$organization->$submittedField) {
+            throw new \Exception("هذا المسار لم يتم تقديمه بعد");
+        }
+        
+        // Approve it
+        $organization->$approvalField = true;
+        $organization->save();
+        
+        // Recalculate final score and rank if all submitted paths are approved
+        $this->recalculateFinalCertificate($organization);
+        
+        return true;
+    }
+
+    /**
+     * Recalculate final certificate score and rank
+     * Uses SUM of all approved paths (consistent with submitCertificate logic)
+     */
+    protected function recalculateFinalCertificate(Organization $organization): void
+    {
+        $scores = [];
+        
+        // Only include approved paths
+        if ($organization->certificate_strategic_approved) {
+            $scores[] = $organization->certificate_strategic_score ?? 0;
+        }
+        
+        if ($organization->certificate_operational_approved) {
+            $scores[] = $organization->certificate_operational_score ?? 0;
+        }
+        
+        if ($organization->certificate_hr_approved) {
+            $scores[] = $organization->certificate_hr_score ?? 0;
+        }
+        
+        // If all 3 paths are approved, calculate final score using SUM (not average)
+        if (count($scores) === 3) {
+            $finalScore = array_sum($scores);
+            $organization->certificate_final_score = round($finalScore, 2);
+            $organization->certificate_final_rank = $this->calculateOverallRank($finalScore);
+            $organization->save();
         }
     }
-    
-    // Sort by percentage descending
-    usort($tableData, function($a, $b) {
-        return $b['percentage'] <=> $a['percentage'];
-    });
-    
-    return [
-        'total_entries' => count($tableData),
-        'total_organizations' => $organizations->count(),
-        'data' => $tableData,
-    ];
-}
 
-/**
- * 🏆 Calculate rank for a specific path (not overall)
- */
-private function calculatePathRank(string $path, float $pathScore): string
-{
-    // Calculate max possible score for this specific path
-    $maxScore = CertificateQuestion::where('path', $path)
-        ->get()
-        ->sum(function($question) {
-            $mapping = $question->points_mapping;
-            $maxPoints = is_array($mapping) ? max($mapping) : 0;
-            return $maxPoints * $question->weight;
-        });
-    
-    $normalizedScore = ($maxScore > 0) ? ($pathScore / $maxScore) * 100 : 0;
+     public function downloadOverallData(int $organizationId, array $approvedPaths = null): array
+    {
+        $organization = Organization::findOrFail($organizationId);
 
-    return match (true) {
-        $normalizedScore >= 86 => 'diamond',
-        $normalizedScore >= 76 => 'gold',
-        $normalizedScore >= 66 => 'silver',
-        $normalizedScore >= 55 => 'bronze',
-        default => 'bronze',
-    };
-}
+        // If no approved paths specified, get all paths (fallback for backward compatibility)
+        if ($approvedPaths === null) {
+            $approvedPaths = ['strategic', 'operational', 'hr'];
+        }
 
-/**
- * 🎨 Get rank icon (emoji or symbol)
- */
-private function getRankIcon(string $rank): string
-{
-    return match($rank) {
-        'diamond' => '💎',
-        'gold' => '🥇',
-        'silver' => '🥈',
-        'bronze' => '🥉',
-        default => '⚪',
-    };
-}
+        $data = [
+            'organization' => [
+                'id' => $organization->id,
+                'name' => $organization->name,
+                'sector' => $organization->sector,
+                'established_at' => $organization->established_at,
+                'email' => $organization->email,
+                'phone' => $organization->phone,
+                'address' => $organization->address,
+                'license_number' => $organization->license_number,
+                'executive_name' => $organization->executive_name,
+            ],
+            'certificate' => [
+                'final_score' => $organization->certificate_final_score,
+                'final_rank' => $organization->certificate_final_rank,
+                'issued_date' => now()->format('Y-m-d'),
+            ],
+            'paths' => [],
+            'approved_paths' => $approvedPaths,
+        ];
 
-/**
- * 📊 Get rank name in Arabic
- */
-private function getRankArabic(string $rank): string
-{
-    return match($rank) {
-        'diamond' => 'شهادة ماسية',
-        'gold' => 'شهادة ذهبية',
-        'silver' => 'شهادة فضية',
-        'bronze' => 'شهادة برونزية',
-        default => 'بدون شهادة',
-    };
-}
+        // Include only approved paths
+        foreach ($approvedPaths as $path) {
+            $scoreField = "certificate_{$path}_score";
+            $submittedField = "certificate_{$path}_submitted";
+            $approvedField = "certificate_{$path}_approved";
 
-/**
- * 🎨 Get rank color for UI
- */
-private function getRankColor(string $rank): string
-{
-    return match($rank) {
-        'diamond' => '#B9F2FF',
-        'gold' => '#FFD700',
-        'silver' => '#C0C0C0',
-        'bronze' => '#CD7F32',
-        default => '#808080',
-    };
-}
-    
+            $data['paths'][$path] = [
+                'name' => ucfirst($path),
+                'score' => $organization->{$scoreField},
+                'submitted' => $organization->{$submittedField},
+                'approved' => $organization->{$approvedField},
+                'status' => $this->getPathStatus($organization, $path),
+            ];
+        }
+
+        // Calculate overall statistics based on approved paths only
+        $data['statistics'] = $this->calculateOverallStatistics($organization, $approvedPaths);
+
+        return $data;
+    }
+
+    /**
+     * Download certificate data for a specific path
+     *
+     * @param int $organizationId
+     * @param string $path
+     * @return array
+     */
+    public function downloadPathData(int $organizationId, string $path): array
+    {
+        $organization = Organization::findOrFail($organizationId);
+
+        $scoreField = "certificate_{$path}_score";
+        $submittedField = "certificate_{$path}_submitted";
+        $approvedField = "certificate_{$path}_approved";
+
+        return [
+            'organization' => [
+                'id' => $organization->id,
+                'name' => $organization->name,
+                'sector' => $organization->sector,
+            ],
+            'path' => [
+                'name' => ucfirst($path),
+                'type' => $path,
+                'score' => $organization->{$scoreField},
+                'submitted' => $organization->{$submittedField},
+                'approved' => $organization->{$approvedField},
+                'status' => $this->getPathStatus($organization, $path),
+                'issued_date' => now()->format('Y-m-d'),
+            ],
+            'details' => $this->getPathDetails($organization, $path),
+        ];
+    }
+
+    /**
+     * Get the status of a specific path
+     *
+     * @param Organization $organization
+     * @param string $path
+     * @return string
+     */
+    private function getPathStatus(Organization $organization, string $path): string
+    {
+        $submittedField = "certificate_{$path}_submitted";
+        $approvedField = "certificate_{$path}_approved";
+
+        if ($organization->{$approvedField}) {
+            return 'approved';
+        }
+
+        if ($organization->{$submittedField}) {
+            return 'pending_approval';
+        }
+
+        return 'not_submitted';
+    }
+
+    /**
+     * Get detailed information for a specific path
+     *
+     * @param Organization $organization
+     * @param string $path
+     * @return array
+     */
+    private function getPathDetails(Organization $organization, string $path): array
+    {
+        $scoreField = "certificate_{$path}_score";
+        $score = $organization->{$scoreField};
+
+        return [
+            'score' => $score,
+            'percentage' => $score ? round($score, 2) : 0,
+            'rank' => $this->determineRank($score),
+            'description' => $this->getPathDescription($path),
+        ];
+    }
+
+    /**
+     * Calculate overall statistics based on approved paths
+     *
+     * @param Organization $organization
+     * @param array $approvedPaths
+     * @return array
+     */
+    private function calculateOverallStatistics(Organization $organization, array $approvedPaths): array
+    {
+        $totalScore = 0;
+        $pathCount = count($approvedPaths);
+
+        foreach ($approvedPaths as $path) {
+            $scoreField = "certificate_{$path}_score";
+            $totalScore += $organization->{$scoreField} ?? 0;
+        }
+
+        $averageScore = $pathCount > 0 ? $totalScore / $pathCount : 0;
+
+        return [
+            'total_approved_paths' => $pathCount,
+            'average_score' => round($averageScore, 2),
+            'total_score' => round($totalScore, 2),
+            'overall_rank' => $this->determineRank($averageScore),
+        ];
+    }
+
+    /**
+     * Determine rank based on score
+     *
+     * @param float|null $score
+     * @return string|null
+     */
+    private function determineRank(?float $score): ?string
+    {
+        if ($score === null) {
+            return null;
+        }
+
+        if ($score >= 90) {
+            return 'diamond';
+        } elseif ($score >= 75) {
+            return 'gold';
+        } elseif ($score >= 60) {
+            return 'silver';
+        } elseif ($score >= 50) {
+            return 'bronze';
+        }
+
+        return null;
+    }
+
+    /**
+     * Get description for a path
+     *
+     * @param string $path
+     * @return string
+     */
+    private function getPathDescription(string $path): string
+    {
+        $descriptions = [
+            'strategic' => 'Strategic planning and management certification path',
+            'operational' => 'Operational excellence and processes certification path',
+            'hr' => 'Human resources management and development certification path',
+        ];
+
+        return $descriptions[$path] ?? '';
+    }
 }

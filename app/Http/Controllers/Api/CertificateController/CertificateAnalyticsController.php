@@ -15,7 +15,7 @@ class CertificateAnalyticsController extends Controller
     }
 
     /**
-     * Get analytics table data (like in the image)
+     * Get analytics table data (only approved certificates)
      * GET /api/admin/certificate/analytics/table
      * 
      * @return \Illuminate\Http\JsonResponse
@@ -23,7 +23,8 @@ class CertificateAnalyticsController extends Controller
     public function analyticsTable(Request $request)
     {
         try {
-            $data = $this->repo->getAnalyticsTable();
+            // Get only approved certificate data
+            $data = $this->repo->getAnalyticsTableApprovedOnly();
 
             return response()->json([
                 'success' => true,
@@ -38,7 +39,7 @@ class CertificateAnalyticsController extends Controller
     }
 
     /**
-     * Get analytics table with filters
+     * Get analytics table with filters (only approved certificates)
      * GET /api/admin/certificate/analytics/table/filtered
      * 
      * @return \Illuminate\Http\JsonResponse
@@ -46,7 +47,8 @@ class CertificateAnalyticsController extends Controller
     public function analyticsTableFiltered(Request $request)
     {
         try {
-            $data = $this->repo->getAnalyticsTable();
+            // Get only approved certificate data
+            $data = $this->repo->getAnalyticsTableApprovedOnly();
             
             // Apply filters
             $filtered = $data['data'];
@@ -102,7 +104,7 @@ class CertificateAnalyticsController extends Controller
     }
 
     /**
-     * Get statistics summary
+     * Get statistics summary (only approved certificates)
      * GET /api/admin/certificate/analytics/stats
      * 
      * @return \Illuminate\Http\JsonResponse
@@ -110,11 +112,13 @@ class CertificateAnalyticsController extends Controller
     public function statistics()
     {
         try {
-            $data = $this->repo->getAnalyticsTable();
+            // Get only approved certificate data
+            $data = $this->repo->getAnalyticsTableApprovedOnly();
             
             // Calculate statistics
             $stats = [
                 'total_organizations' => $data['total_organizations'],
+                'total_approved_certificates' => count($data['data']),
                 'by_rank' => [
                     'diamond' => 0,
                     'gold' => 0,
@@ -133,7 +137,9 @@ class CertificateAnalyticsController extends Controller
             
             foreach ($data['data'] as $item) {
                 // Count by rank
-                $stats['by_rank'][$item['rank']]++;
+                if (isset($stats['by_rank'][$item['rank']])) {
+                    $stats['by_rank'][$item['rank']]++;
+                }
                 
                 // Count by path completion
                 if ($item['is_complete']) {
@@ -158,6 +164,29 @@ class CertificateAnalyticsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'فشل في حساب الإحصائيات: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get pending approvals count
+     * GET /api/admin/certificate/analytics/pending-approvals
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function pendingApprovals()
+    {
+        try {
+            $pending = $this->repo->getPendingApprovalsCount();
+            
+            return response()->json([
+                'success' => true,
+                'data' => $pending
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في حساب الموافقات المعلقة: ' . $e->getMessage()
             ], 500);
         }
     }
