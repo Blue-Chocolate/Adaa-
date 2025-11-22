@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Release extends Model
 {  
     use HasFactory, SoftDeletes;
+
 protected $fillable = ['title', 'file_path', 'excel_path', 'powerbi_path', 'description', 'image', 'release_category_id', 'author'];
 
         public function category()
