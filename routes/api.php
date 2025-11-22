@@ -18,6 +18,12 @@ use App\Http\Controllers\Api\Shield\ShieldDownloadController;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
+use App\Http\Controllers\Api\CertificateController\CertificateSummaryController;
+use App\Http\Controllers\Api\CertificateController\CertificateQuestionController;
+use App\Http\Controllers\Api\CertificateController\CertificateAnswerController;
+use App\Http\Controllers\Api\CertificateController\CertificateSubmissionController;
+use App\Http\Controllers\Api\CertificateController\CertificateDownloadController;
+use App\Http\Controllers\Api\CertificateController\CertificateFileController;
 
 use App\Http\Controllers\DumpAuthenticationController;
 
@@ -137,39 +143,7 @@ Route::middleware(['auth:sanctum', 'organization.approved'])->prefix('shield')->
 
 });
 
-use App\Http\Controllers\Api\CertificateController\CertificateSummaryController;
-// Route::middleware(['auth:sanctum'])->prefix('certificates')->group(function () {
-    
-//     // ➊ Get questions by path
-//     Route::get('/{path}/questions', [CertificateController::class, 'getQuestionsByPath']);
-    
-//     // ➋ Save answers (with file upload or URL)
-//     Route::post('/{path}/answers', [CertificateController::class, 'saveAnswers']);
-    
-//     // ➌ Submit certificate for a path
-//     Route::post('/{path}/submit', [CertificateController::class, 'submitCertificate']);
-    
-//     // ➏ Bulk upload answers (JSON with URLs)
-//     Route::post('/{path}/upload-answers', [CertificateController::class, 'uploadAnswers']);
-    
-//     // ➐ Download path data
-//     Route::get('/{path}/download', [CertificateController::class, 'downloadPath']);
-    
-//     // ➑ Download overall data (all paths)
-//     Route::get('/download', [CertificateController::class, 'downloadOverall']);
-    
-//     // ➒ Get user summary
-//     Route::get('/summary', [CertificateSummaryController::class, 'summary']);
-    
-//     // ➓ Upload file only (get URL back)
-//     Route::post('/{path}/upload', [CertificateController::class, 'uploadFile']);
-// });
-   
-use App\Http\Controllers\Api\CertificateController\CertificateQuestionController;
-use App\Http\Controllers\Api\CertificateController\CertificateAnswerController;
-use App\Http\Controllers\Api\CertificateController\CertificateSubmissionController;
-use App\Http\Controllers\Api\CertificateController\CertificateDownloadController;
-use App\Http\Controllers\Api\CertificateController\CertificateFileController;
+
 
 Route::middleware(['auth:sanctum','organization.approved'])->prefix('certificates')->group(function () {
     
@@ -202,20 +176,12 @@ Route::middleware(['auth:sanctum','organization.approved'])->prefix('certificate
     
     // ➎ Get all registered organizations
     Route::get('/organizations', [CertificateController::class, 'getAllOrganizations']);
-use App\Http\Controllers\Api\ModelController\ModelController;
 
-Route::get('/models', [ModelController::class, 'index']);
-Route::get('/models/{id}', [ModelController::class, 'show']);
-// For single attachment per model
-Route::get('models/{id}/download', [ModelController::class, 'downloadAttachment']);
+
 
 // For multiple attachments per model
-Route::get('models/{modelId}/attachments/{attachmentId}/download', [ModelController::class, 'downloadAttachmentById']);
 
-use App\Http\Controllers\Api\DesginController\DesginController;
 
-Route::get('/dashboards', [DesginController::class, 'index']);
-Route::get('/dashboards/{id}', [DesginController::class, 'show']);
 
 use App\Http\Controllers\Api\NewsController\NewsController;
 
@@ -230,12 +196,27 @@ Route::post('/subscribe/pro', [SubscriptionController::class, 'subscribeToPro'])
     ->middleware('auth:sanctum');
 Route::get('/subscriptions/pro', [\App\Http\Controllers\Api\SubscriptionController\SubscriptionController::class, 'getProUsers'])->middleware('auth:sanctum');
 
+use App\Http\Controllers\Api\ModelController\ModelController;
+use App\Http\Controllers\Api\DesginController\DesginController;
 use App\Http\Controllers\Api\ToolController\ToolController;
 Route::prefix('tools')->group(function () {
     Route::get('/', [ToolController::class, 'index']);
     Route::get('/{id}', [ToolController::class, 'show']);
-    Route::get('/{id}/download', [ToolController::class, 'download']);
+    
 });
+Route::get('/dashboards', [DesginController::class, 'index']);
+Route::get('/dashboards/{id}', [DesginController::class, 'show']);
+Route::get('/models', [ModelController::class, 'index']);
+Route::get('/models/{id}', [ModelController::class, 'show']);
+// For single attachment per model
+Route::get('models/{modelId}/attachments/{attachmentId}/download', [ModelController::class, 'downloadAttachmentById']);
+
+Route::middleware(['auth:sanctum', 'subscribed'])->group(function () {{
+    Route::get('models/{id}/download', [ModelController::class, 'downloadAttachment']);
+    Route::get('/dashboards/{id}/download', [DesginController::class, 'download']);
+    Route::get('/tools/{id}/download', [ToolController::class, 'download']);
+
+}});
 
 use App\Http\Controllers\Api\EpisodeController\EpisodeController;
 

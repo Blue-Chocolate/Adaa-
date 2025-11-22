@@ -29,7 +29,7 @@ class ShieldAttachmentController extends Controller
 
         // Validate request
         $request->validate([
-            'files' => 'required|array|max:3', // accept up to 3 files
+            'files' => 'array|max:3', // accept up to 3 files
             'files.*' => 'file|mimes:pdf,docx,doc,jpg,jpeg,png,xlsx,xls|max:10240', // each file max 10MB
         ]);
 

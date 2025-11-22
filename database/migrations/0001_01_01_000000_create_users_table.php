@@ -13,9 +13,10 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->string('phone')->unique()->nullable();
+            $table->enum('role', ['founder', 'donor', 'manager'])->default('donor');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('user_priviliages')->nullable();
+            $table->string('user_privileges')->nullable();
             $table->string('otp')->nullable();
             $table->timestamp('otp_expires_at')->nullable();
 

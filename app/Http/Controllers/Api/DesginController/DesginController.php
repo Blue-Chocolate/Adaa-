@@ -35,4 +35,14 @@ class DesginController extends Controller
 
         return response()->json($Desgin);
     }
+    public function download(int $id)
+    {
+        $Desgin = $this->repo->find($id);
+
+        if (!$Desgin || !$Desgin->attachment_path) {
+            return response()->json(['message' => 'Attachment not found'], 404);
+        }
+
+        return response()->download(storage_path('app/public/' . $Desgin->attachment_path));
+    }   
 }
