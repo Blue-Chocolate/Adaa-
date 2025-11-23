@@ -391,6 +391,37 @@ class OrganizationResource extends Resource
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
+                            Tables\Actions\Action::make('view_shield')
+            ->label('View Shield')
+            ->icon('heroicon-o-shield-check')
+            ->color('info')
+            ->modalHeading(fn (Organization $record) => 'Shield Submission - ' . $record->name)
+            ->modalWidth('7xl')
+            ->modalContent(fn (Organization $record) => view('filament.modals.view-shield-submission', [
+                'organization' => $record->load('shieldAxisResponses.axis.questions')
+            ])),
+
+             Tables\Actions\Action::make('view_certificate')
+            ->label('View Certificate')
+            ->icon('heroicon-o-academic-cap')
+            ->color('success')
+            ->modalHeading(fn (Organization $record) => 'Certificate Submission - ' . $record->name)
+            ->modalWidth('7xl')
+            ->modalContent(fn (Organization $record) => view('filament.modals.view-certificate-submission', [
+                'organization' => $record->load('certificateAnswers.question.axis')
+            ]))
+            ->visible(fn (Organization $record) => $record->certificateAnswers()->exists()),
+
+             Tables\Actions\Action::make('view_shield')
+            ->label('View Shield')
+            ->icon('heroicon-o-shield-check')
+            ->color('info')
+            ->modalHeading(fn (Organization $record) => 'Shield Submission - ' . $record->name)
+            ->modalWidth('7xl')
+            ->modalContent(fn (Organization $record) => view('filament.modals.view-shield-submission', [
+                'organization' => $record->load('shieldAxisResponses.axis.questions')
+            ]))
+            ->visible(fn (Organization $record) => $record->shieldAxisResponses()->exists()),
 
                     Tables\Actions\Action::make('approve')
                         ->label('Approve')
