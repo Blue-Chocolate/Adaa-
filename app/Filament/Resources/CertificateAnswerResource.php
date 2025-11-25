@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class CertificateAnswerResource extends Resource
 {
@@ -100,85 +101,71 @@ class CertificateAnswerResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->query(
+                // Group by organization to show one row per organization
+                CertificateAnswer::query()
+                    ->select([
+                        'organization_id',
+                        DB::raw('MIN(id) as id'), // Need an id for Filament
+                        DB::raw('COUNT(*) as total_questions'),
+                        DB::raw('SUM(points) as total_points'),
+                        DB::raw('SUM(final_points) as total_final_points'),
+                        DB::raw('COUNT(CASE WHEN attachment_path IS NOT NULL THEN 1 END) as attachments_count'),
+                        DB::raw('MAX(created_at) as latest_submission'),
+                    ])
+                    ->groupBy('organization_id')
+            )
             ->columns([
                 Tables\Columns\TextColumn::make('organization.name')
                     ->label('Organization')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('question.question_text')
-                    ->label('Question')
-                    ->limit(50)
-                    ->searchable()
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('total_questions')
+                    ->label('Total Questions')
+                    ->sortable()
+                    ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('question.axis.name')
-                    ->label('Axis')
-                    ->searchable()
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('selected_option')
-                    ->label('Answer')
-                    ->limit(30)
-                    ->searchable(),
-
-                Tables\Columns\TextColumn::make('points')
-                    ->label('Points')
+                Tables\Columns\TextColumn::make('total_points')
+                    ->label('Total Points')
                     ->numeric(2)
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('final_points')
-                    ->label('Final Points')
+                Tables\Columns\TextColumn::make('total_final_points')
+                    ->label('Total Final Points')
                     ->numeric(2)
                     ->sortable()
-                    ->color('success'),
+                    ->color('success')
+                    ->weight('bold'),
 
-                Tables\Columns\IconColumn::make('attachment_path')
-                    ->label('Has Attachment')
-                    ->boolean()
-                    ->trueIcon('heroicon-o-check-circle')
-                    ->falseIcon('heroicon-o-x-circle'),
+                Tables\Columns\TextColumn::make('attachments_count')
+                    ->label('Attachments')
+                    ->sortable()
+                    ->alignCenter()
+                    ->badge()
+                    ->color(fn ($state) => $state > 0 ? 'success' : 'gray'),
 
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Submitted At')
+                Tables\Columns\TextColumn::make('latest_submission')
+                    ->label('Latest Submission')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('organization')
                     ->relationship('organization', 'name')
                     ->searchable()
                     ->preload(),
-
-                Tables\Filters\SelectFilter::make('axis')
-                    ->label('Axis')
-                    ->relationship('question.axis', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                Tables\Filters\Filter::make('has_attachment')
-                    ->label('Has Attachment')
-                    ->query(fn (Builder $query): Builder => $query->whereNotNull('attachment_path')),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ])
-            ->defaultSort('created_at', 'desc');
+            ->bulkActions([])
+            ->defaultSort('latest_submission', 'desc');
     }
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

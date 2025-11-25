@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CertificateAnswerResource\Pages;
 
 use App\Filament\Resources\CertificateAnswerResource;
+use App\Models\CertificateAnswer;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
@@ -15,61 +16,112 @@ class ViewCertificateAnswer extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make(),
-            Actions\DeleteAction::make(),
+            // Removed edit/delete as we're viewing aggregated data
         ];
     }
 
     public function infolist(Infolist $infolist): Infolist
     {
-        return $infolist
-            ->schema([
-                Components\Section::make('Organization & Question')
-                    ->schema([
-                        Components\TextEntry::make('organization.name')
-                            ->label('Organization'),
-                        Components\TextEntry::make('question.question_text')
-                            ->label('Question'),
-                        Components\TextEntry::make('question.axis.name')
-                            ->label('Axis'),
-                    ])
-                    ->columns(2),
+        // Get all answers for this organization
+        $organizationId = $this->record->organization_id;
+        $answers = CertificateAnswer::with(['question.axis', 'organization'])
+            ->where('organization_id', $organizationId)
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-                Components\Section::make('Answer Details')
+        $organization = $answers->first()?->organization;
+
+        // Group answers by axis
+        $answersByAxis = $answers->groupBy('question.axis.name');
+
+        $sections = [
+            Components\Section::make('Organization Summary')
+                ->schema([
+                    Components\TextEntry::make('organization.name')
+                        ->label('Organization Name'),
+                    Components\TextEntry::make('total_questions')
+                        ->label('Total Questions Answered')
+                        ->state($answers->count()),
+                    Components\TextEntry::make('total_points')
+                        ->label('Total Points')
+                        ->state($answers->sum('points')),
+                    Components\TextEntry::make('total_final_points')
+                        ->label('Total Final Points')
+                        ->state($answers->sum('final_points'))
+                        ->color('success'),
+                ])
+                ->columns(4),
+        ];
+
+        // Create a section for each axis
+        foreach ($answersByAxis as $axisName => $axisAnswers) {
+            $answersSchema = [];
+            
+            $answerCount = 0;
+            $totalAnswers = $axisAnswers->count();
+            
+            foreach ($axisAnswers as $answer) {
+                $answerCount++;
+                
+                // Question
+                $answersSchema[] = Components\TextEntry::make('question_' . $answer->id)
+                    ->label('Question')
+                    ->state($answer->question->question_text)
+                    ->columnSpan('full');
+                
+                // Answer, Points, Final Points
+                $answersSchema[] = Components\Grid::make(3)
                     ->schema([
-                        Components\TextEntry::make('selected_option')
-                            ->label('Selected Option'),
-                        Components\TextEntry::make('points')
-                            ->label('Points'),
-                        Components\TextEntry::make('final_points')
+                        Components\TextEntry::make('answer_' . $answer->id)
+                            ->label('Selected Answer')
+                            ->state($answer->selected_option)
+                            ->badge()
+                            ->color('primary'),
+                        
+                        Components\TextEntry::make('points_' . $answer->id)
+                            ->label('Points')
+                            ->state($answer->points),
+                        
+                        Components\TextEntry::make('final_points_' . $answer->id)
                             ->label('Final Points')
+                            ->state($answer->final_points)
                             ->color('success'),
-                    ])
-                    ->columns(3),
+                    ]);
 
-                Components\Section::make('Attachments')
+                // Attachment and Submission Date
+                $answersSchema[] = Components\Grid::make(2)
                     ->schema([
-                        Components\TextEntry::make('attachment_path')
-                            ->label('Attachment File')
-                            ->default('No attachment'),
-                        Components\TextEntry::make('attchment_url')
-                            ->label('Attachment URL')
-                            ->url(fn ($state) => $state)
-                            ->openUrlInNewTab()
-                            ->default('No URL provided'),
-                    ])
-                    ->columns(2),
+                        Components\TextEntry::make('attachment_' . $answer->id)
+                            ->label('Attachment')
+                            ->state(function () use ($answer) {
+                                if ($answer->attachment_path) {
+                                    return '📎 File attached';
+                                } elseif ($answer->attchment_url) {
+                                    return '🔗 URL provided';
+                                }
+                                return 'No attachment';
+                            }),
+                        
+                        Components\TextEntry::make('submitted_' . $answer->id)
+                            ->label('Submitted At')
+                            ->state($answer->created_at->format('M d, Y H:i')),
+                    ]);
+                
+                // Add spacing between answers (but not after the last one)
+                if ($answerCount < $totalAnswers) {
+                    $answersSchema[] = Components\Section::make()
+                        ->schema([])
+                        ->columnSpan('full');
+                }
+            }
 
-                Components\Section::make('Metadata')
-                    ->schema([
-                        Components\TextEntry::make('created_at')
-                            ->label('Created At')
-                            ->dateTime(),
-                        Components\TextEntry::make('updated_at')
-                            ->label('Updated At')
-                            ->dateTime(),
-                    ])
-                    ->columns(2),
-            ]);
+            $sections[] = Components\Section::make($axisName ?: 'Uncategorized')
+                ->schema($answersSchema)
+                ->collapsible()
+                ->collapsed(false)
+                ->description('Total: ' . $axisAnswers->sum('final_points') . ' points (' . $axisAnswers->count() . ' questions)');
+        }
+
+        return $infolist->schema($sections);
     }
 }
