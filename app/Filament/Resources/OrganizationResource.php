@@ -12,7 +12,6 @@ use Filament\Tables\Table;
 use Filament\Notifications\Notification;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Tables\Actions\Action;
 use App\Filament\Resources\OrganizationResource\RelationManagers\ShieldAxisResponsesRelationManager;
 use App\Filament\Resources\OrganizationResource\RelationManagers\CertificateAnswersRelationManager;
 
@@ -391,38 +390,32 @@ class OrganizationResource extends Resource
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
-                            Tables\Actions\Action::make('view_shield')
-            ->label('View Shield')
-            ->icon('heroicon-o-shield-check')
-            ->color('info')
-            ->modalHeading(fn (Organization $record) => 'Shield Submission - ' . $record->name)
-            ->modalWidth('7xl')
-            ->modalContent(fn (Organization $record) => view('filament.modals.view-shield-submission', [
-                'organization' => $record->load('shieldAxisResponses.axis.questions')
-            ])),
+                    
+                    // Shield View Action
+                    Tables\Actions\Action::make('view_shield')
+                        ->label('View Shield')
+                        ->icon('heroicon-o-shield-check')
+                        ->color('info')
+                        ->modalHeading(fn (Organization $record) => 'Shield Submission - ' . $record->name)
+                        ->modalWidth('7xl')
+                        ->modalContent(fn (Organization $record) => view('filament.modals.view-shield-submission', [
+                            'organization' => $record->load('shieldAxisResponses.axis.questions')
+                        ]))
+                        ->visible(fn (Organization $record) => $record->shieldAxisResponses()->exists()),
+                    
+                    // Certificate View Action
+                    Tables\Actions\Action::make('view_certificate')
+                        ->label('View Certificate')
+                        ->icon('heroicon-o-academic-cap')
+                        ->color('success')
+                        ->modalHeading(fn (Organization $record) => 'Certificate Submission - ' . $record->name)
+                        ->modalWidth('7xl')
+                        ->modalContent(fn (Organization $record) => view('filament.modals.view-certificate-submission', [
+                            'organization' => $record->load('certificateAnswers.question.axis')
+                        ]))
+                        ->visible(fn (Organization $record) => $record->certificateAnswers()->exists()),
 
-             Tables\Actions\Action::make('view_certificate')
-            ->label('View Certificate')
-            ->icon('heroicon-o-academic-cap')
-            ->color('success')
-            ->modalHeading(fn (Organization $record) => 'Certificate Submission - ' . $record->name)
-            ->modalWidth('7xl')
-            ->modalContent(fn (Organization $record) => view('filament.modals.view-certificate-submission', [
-                'organization' => $record->load('certificateAnswers.question.axis')
-            ]))
-            ->visible(fn (Organization $record) => $record->certificateAnswers()->exists()),
-
-             Tables\Actions\Action::make('view_shield')
-            ->label('View Shield')
-            ->icon('heroicon-o-shield-check')
-            ->color('info')
-            ->modalHeading(fn (Organization $record) => 'Shield Submission - ' . $record->name)
-            ->modalWidth('7xl')
-            ->modalContent(fn (Organization $record) => view('filament.modals.view-shield-submission', [
-                'organization' => $record->load('shieldAxisResponses.axis.questions')
-            ]))
-            ->visible(fn (Organization $record) => $record->shieldAxisResponses()->exists()),
-
+                    // Approve Action
                     Tables\Actions\Action::make('approve')
                         ->label('Approve')
                         ->icon('heroicon-o-check-circle')
@@ -441,6 +434,7 @@ class OrganizationResource extends Resource
                                 ->send();
                         }),
 
+                    // Decline Action
                     Tables\Actions\Action::make('decline')
                         ->label('Decline')
                         ->icon('heroicon-o-x-circle')
@@ -459,6 +453,7 @@ class OrganizationResource extends Resource
                                 ->send();
                         }),
 
+                    // Reset Status Action
                     Tables\Actions\Action::make('reset_status')
                         ->label('Reset to Pending')
                         ->icon('heroicon-o-arrow-path')
@@ -719,18 +714,14 @@ class OrganizationResource extends Resource
     }
 
     public static function getPages(): array
-{
-    return [
-        'index' => Pages\ListOrganizations::route('/'),
-        'create' => Pages\CreateOrganization::route('/create'),
-        'view' => Pages\ViewOrganization::route('/{record}'),
-        'edit' => Pages\EditOrganization::route('/{record}/edit'),
-        
-        // Add these new pages
-        'view-shield' => Pages\ViewShieldSubmission::route('/{record}/shield'),
-        'view-certificate' => Pages\ViewCertificateSubmission::route('/{record}/certificate'),
-    ];
-}
+    {
+        return [
+            'index' => Pages\ListOrganizations::route('/'),
+            'create' => Pages\CreateOrganization::route('/create'),
+            'view' => Pages\ViewOrganization::route('/{record}'),
+            'edit' => Pages\EditOrganization::route('/{record}/edit'),
+        ];
+    }
 
     public static function getNavigationBadge(): ?string
     {
@@ -742,3 +733,4 @@ class OrganizationResource extends Resource
         return 'warning';
     }
 }
+

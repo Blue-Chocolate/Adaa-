@@ -20,6 +20,7 @@ class CertificateAnswer extends Model
         'points',
         'final_points',
         'attachment_path',
+        'attchment_url',
     ];
 
     protected $casts = [

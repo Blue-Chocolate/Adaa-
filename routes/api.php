@@ -27,13 +27,7 @@ use App\Http\Controllers\Api\CertificateController\CertificateFileController;
 
 use App\Http\Controllers\DumpAuthenticationController;
 
-// Route::post('/register', [DumpAuthenticationController::class, 'register']);
-// Route::post('/login', [DumpAuthenticationController::class, 'login']);
 
-// Route::middleware('auth:sanctum')->group(function () {
-//     Route::post('/logout', [DumpAuthenticationController::class, 'logout']);
-    // Route::get('/me', [DumpAuthenticationController::class, 'me']);
-// });
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes

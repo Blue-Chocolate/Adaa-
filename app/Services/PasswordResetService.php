@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Mail\PasswordResetEmail;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -14,61 +14,49 @@ use Exception;
 
 class PasswordResetService
 {
-    /**
-     * Token expiry time in minutes
-     */
-    private const TOKEN_EXPIRY_MINUTES = 60;
+    const TOKEN_EXPIRY_MINUTES = 60; // 1 hour
+    const RESEND_COOLDOWN_MINUTES = 2; // 2 minutes between resend requests
 
     /**
-     * Minimum minutes between reset requests
+     * Send password reset email
      */
-    private const RESEND_COOLDOWN_MINUTES = 2;
-
-    /**
-     * Generate and send password reset email
-     */
-    public function sendResetLink(string $email): array
+    public function sendResetEmail(string $email): array
     {
         try {
-            $user = User::where('email', $email)->first();
+            Log::info('Password reset requested', ['email' => $email]);
 
+            // Check if user exists
+            $user = User::where('email', $email)->first();
+            
             if (!$user) {
                 Log::warning('Password reset requested for non-existent email', ['email' => $email]);
-                // Security: Don't reveal if email exists
+                // Return generic message for security (don't reveal if email exists)
                 return [
                     'success' => true,
                     'message' => 'If your email exists in our system, you will receive a password reset link shortly.'
                 ];
             }
 
-            // Rate limit check
-            $recentReset = DB::table('password_reset_tokens')
-                ->where('email', $email)
-                ->first();
-
-            if ($recentReset) {
-                $lastSent = Carbon::parse($recentReset->created_at);
-                $minutesSinceLastSent = now()->diffInMinutes($lastSent);
+            // Check cooldown from last token sent
+            $existing = DB::table('password_reset_tokens')->where('email', $email)->first();
+            
+            if ($existing) {
+                $lastSentAt = Carbon::parse($existing->created_at);
+                $minutesSinceLastSent = $lastSentAt->diffInMinutes(now());
                 
                 if ($minutesSinceLastSent < self::RESEND_COOLDOWN_MINUTES) {
-                    $waitTime = self::RESEND_COOLDOWN_MINUTES - $minutesSinceLastSent;
-                    Log::warning('Password reset rate limit hit', [
-                        'email' => $email,
-                        'minutes_since_last' => $minutesSinceLastSent,
-                        'wait_minutes' => $waitTime
-                    ]);
-                    
+                    $remaining = self::RESEND_COOLDOWN_MINUTES - $minutesSinceLastSent;
                     return [
                         'success' => false,
-                        'message' => "Please wait {$waitTime} minute(s) before requesting another password reset email"
+                        'message' => 'Please wait ' . $remaining . ' minute(s) before requesting another password reset email'
                     ];
                 }
             }
 
-            // Generate new token (64 character random string)
+            // Generate new token (plain text - will be hashed before storage)
             $plainToken = Str::random(64);
 
-            // Remove old tokens
+            // Delete old tokens
             DB::table('password_reset_tokens')->where('email', $email)->delete();
 
             // Store HASHED token in database
@@ -78,12 +66,13 @@ class PasswordResetService
                 'created_at' => now()
             ]);
 
-            // Build frontend reset URL (user will enter new password here)
+            // Build frontend reset URL
             $resetUrl = "https://blueviolet-gerbil-246756.hostingersite.com/reset-password?token={$plainToken}&email=" . urlencode($email);
 
-            // ===========================================
+            // =========================================
             // 🔥 DEBUG MODE - LOG TOKEN FOR TESTING
-            // ===========================================
+            // ⚠️ REMOVE THIS IN PRODUCTION!
+            // =========================================
             Log::info('🔑 PASSWORD RESET TOKEN GENERATED', [
                 'email' => $email,
                 'user_id' => $user->id,
@@ -93,7 +82,7 @@ class PasswordResetService
                 'expires_at' => now()->addMinutes(self::TOKEN_EXPIRY_MINUTES)->toDateTimeString(),
                 '⚠️ WARNING' => 'REMOVE THIS LOG IN PRODUCTION!'
             ]);
-            // ===========================================
+            // =========================================
 
             // Send email
             try {
@@ -104,6 +93,11 @@ class PasswordResetService
                     'email' => $email,
                     'error' => $mailException->getMessage()
                 ]);
+                
+                return [
+                    'success' => false,
+                    'message' => 'Failed to send password reset email. Please try again later.'
+                ];
             }
 
             return [
@@ -142,10 +136,9 @@ class PasswordResetService
 
             // Find user
             $user = User::where('email', $email)->first();
-
+            
             if (!$user) {
                 Log::warning('❌ Password reset failed - user not found', ['email' => $email]);
-                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token or email'
@@ -164,7 +157,6 @@ class PasswordResetService
                     'email' => $email,
                     'user_id' => $user->id
                 ]);
-                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token or email. Please request a new password reset.'
@@ -192,7 +184,6 @@ class PasswordResetService
                     'user_id' => $user->id,
                     'reason' => 'Token does not match stored hash'
                 ]);
-                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token. Please request a new password reset.'
@@ -212,14 +203,14 @@ class PasswordResetService
                 'is_expired' => $isExpired ? 'YES' : 'NO',
                 'age_minutes' => now()->diffInMinutes(Carbon::parse($resetRecord->created_at))
             ]);
-            
+
             if ($isExpired) {
                 Log::warning('❌ Password reset failed - token expired', [
                     'email' => $email,
                     'user_id' => $user->id,
                     'age_minutes' => now()->diffInMinutes(Carbon::parse($resetRecord->created_at))
                 ]);
-                
+
                 // Clean up expired token
                 DB::table('password_reset_tokens')->where('email', $email)->delete();
 
@@ -240,12 +231,10 @@ class PasswordResetService
 
             // Delete used token
             DB::table('password_reset_tokens')->where('email', $email)->delete();
-
             Log::info('✓ Token deleted from database');
 
             // Revoke all tokens (force logout from all devices)
             $revokedCount = $user->tokens()->delete();
-
             Log::info('✓ Auth tokens revoked', ['count' => $revokedCount]);
 
             Log::info('✅ Password reset completed successfully', [
@@ -300,7 +289,6 @@ class PasswordResetService
 
             if (!$resetRecord) {
                 Log::warning('Token verification failed - no record found', ['email' => $email]);
-                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token'
@@ -310,7 +298,6 @@ class PasswordResetService
             // Verify token
             if (!Hash::check($token, $resetRecord->token)) {
                 Log::warning('Token verification failed - invalid token', ['email' => $email]);
-                
                 return [
                     'success' => false,
                     'message' => 'Invalid reset token'
@@ -325,10 +312,10 @@ class PasswordResetService
                     'email' => $email,
                     'expires_at' => $expiresAt
                 ]);
-                
+
                 // Clean up expired token
                 DB::table('password_reset_tokens')->where('email', $email)->delete();
-                
+
                 return [
                     'success' => false,
                     'message' => 'Token has expired'
@@ -336,7 +323,7 @@ class PasswordResetService
             }
 
             $remainingMinutes = now()->diffInMinutes($expiresAt);
-            
+
             Log::info('Token verification successful', [
                 'email' => $email,
                 'remaining_minutes' => $remainingMinutes

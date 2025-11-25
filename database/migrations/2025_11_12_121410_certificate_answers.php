@@ -16,6 +16,7 @@ return new class extends Migration
             $table->decimal('points', 8, 2)->nullable(); // Base points from mapping
             $table->decimal('final_points', 8, 2)->nullable(); // Points × weight
             $table->string('attachment_path')->nullable();
+            $table->string('attachment_url')->nullable();
             $table->timestamps();
         });
     }
