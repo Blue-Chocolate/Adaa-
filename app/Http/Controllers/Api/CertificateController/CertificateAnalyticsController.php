@@ -17,13 +17,10 @@ class CertificateAnalyticsController extends Controller
     /**
      * Get analytics table data (only approved certificates)
      * GET /api/admin/certificate/analytics/table
-     * 
-     * @return \Illuminate\Http\JsonResponse
      */
     public function analyticsTable(Request $request)
     {
         try {
-            // Get only approved certificate data
             $data = $this->repo->getAnalyticsTableApprovedOnly();
 
             return response()->json([
@@ -41,33 +38,26 @@ class CertificateAnalyticsController extends Controller
     /**
      * Get analytics table with filters (only approved certificates)
      * GET /api/admin/certificate/analytics/table/filtered
-     * 
-     * @return \Illuminate\Http\JsonResponse
      */
     public function analyticsTableFiltered(Request $request)
     {
         try {
-            // Get only approved certificate data
             $data = $this->repo->getAnalyticsTableApprovedOnly();
             
-            // Apply filters
             $filtered = $data['data'];
             
-            // Filter by path
             if ($request->has('path')) {
                 $filtered = array_filter($filtered, function($item) use ($request) {
                     return $item['path'] === $request->path;
                 });
             }
             
-            // Filter by rank
             if ($request->has('rank')) {
                 $filtered = array_filter($filtered, function($item) use ($request) {
                     return $item['rank'] === $request->rank;
                 });
             }
             
-            // Filter by completion status
             if ($request->has('completed')) {
                 $completed = filter_var($request->completed, FILTER_VALIDATE_BOOLEAN);
                 $filtered = array_filter($filtered, function($item) use ($completed) {
@@ -75,7 +65,6 @@ class CertificateAnalyticsController extends Controller
                 });
             }
             
-            // Search by organization name
             if ($request->has('search')) {
                 $search = strtolower($request->search);
                 $filtered = array_filter($filtered, function($item) use ($search) {
@@ -83,7 +72,6 @@ class CertificateAnalyticsController extends Controller
                 });
             }
             
-            // Re-index array
             $filtered = array_values($filtered);
             
             return response()->json([
@@ -106,16 +94,12 @@ class CertificateAnalyticsController extends Controller
     /**
      * Get statistics summary (only approved certificates)
      * GET /api/admin/certificate/analytics/stats
-     * 
-     * @return \Illuminate\Http\JsonResponse
      */
     public function statistics()
     {
         try {
-            // Get only approved certificate data
             $data = $this->repo->getAnalyticsTableApprovedOnly();
             
-            // Calculate statistics
             $stats = [
                 'total_organizations' => $data['total_organizations'],
                 'total_approved_certificates' => count($data['data']),
@@ -136,12 +120,10 @@ class CertificateAnalyticsController extends Controller
             $totalPercentage = 0;
             
             foreach ($data['data'] as $item) {
-                // Count by rank
                 if (isset($stats['by_rank'][$item['rank']])) {
                     $stats['by_rank'][$item['rank']]++;
                 }
                 
-                // Count by path completion
                 if ($item['is_complete']) {
                     $stats['by_path'][$item['path']]['completed']++;
                 } else if ($item['percentage'] > 0) {
@@ -151,7 +133,6 @@ class CertificateAnalyticsController extends Controller
                 $totalPercentage += $item['percentage'];
             }
             
-            // Calculate average
             if (count($data['data']) > 0) {
                 $stats['average_completion'] = round($totalPercentage / count($data['data']), 2);
             }
@@ -171,8 +152,6 @@ class CertificateAnalyticsController extends Controller
     /**
      * Get pending approvals count
      * GET /api/admin/certificate/analytics/pending-approvals
-     * 
-     * @return \Illuminate\Http\JsonResponse
      */
     public function pendingApprovals()
     {

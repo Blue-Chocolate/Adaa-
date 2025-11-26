@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Handles file uploads for certificates
@@ -21,7 +22,7 @@ class CertificateFileController extends Controller
         if (!$this->isValidPath($path)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid path. Allowed: strategic, operational, hr'
+                'message' => 'مسار غير صحيح. المسارات المسموحة: strategic, operational, hr'
             ], 400);
         }
 
@@ -30,11 +31,10 @@ class CertificateFileController extends Controller
         if (!$organization) {
             return response()->json([
                 'success' => false,
-                'message' => 'Organization not found for this user'
+                'message' => 'المنظمة غير موجودة لهذا المستخدم'
             ], 404);
         }
 
-        // Validate file upload
         $validator = Validator::make($request->all(), [
             'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
         ]);
@@ -42,6 +42,7 @@ class CertificateFileController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
+                'message' => 'فشل في التحقق من الملف',
                 'errors' => $validator->errors()
             ], 422);
         }
@@ -49,7 +50,7 @@ class CertificateFileController extends Controller
         try {
             $file = $request->file('file');
             $attachmentPath = $file->store("certificate_attachments/{$path}/{$organization->id}", 'public');
-            $attachmentUrl = asset('storage/' . $attachmentPath);
+            $attachmentUrl = Storage::disk('public')->url($attachmentPath);
 
             return response()->json([
                 'success' => true,

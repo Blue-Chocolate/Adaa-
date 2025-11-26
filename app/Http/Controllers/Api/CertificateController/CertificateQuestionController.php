@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\CertificateController;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\CertificateRepository;
-use Illuminate\Http\Request;
 
 /**
  * Handles fetching certificate questions
@@ -28,16 +27,23 @@ class CertificateQuestionController extends Controller
         if (!$this->isValidPath($path)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid path. Allowed: strategic, operational, hr'
+                'message' => 'مسار غير صحيح. المسارات المسموحة: strategic, operational, hr'
             ], 400);
         }
 
-        $axes = $this->repo->getQuestionsByPath($path);
-        
-        return response()->json([
-            'success' => true,
-            'data' => $axes
-        ]);
+        try {
+            $axes = $this->repo->getQuestionsByPath($path);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $axes
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في استرجاع الأسئلة: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

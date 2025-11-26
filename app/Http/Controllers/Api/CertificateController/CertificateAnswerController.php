@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\CertificateController;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\CertificateRepository;
+use App\Models\CertificateQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -36,7 +37,6 @@ class CertificateAnswerController extends Controller
                 'user_id' => $request->user()?->id
             ]);
 
-            // Validate path
             if (!$this->isValidPath($path)) {
                 Log::warning('Invalid path provided', ['path' => $path]);
                 return response()->json([
@@ -46,7 +46,6 @@ class CertificateAnswerController extends Controller
                 ], 400);
             }
 
-            // Get organization
             $organization = $request->user()->organization;
             
             if (!$organization) {
@@ -63,7 +62,6 @@ class CertificateAnswerController extends Controller
                 'path' => $path
             ]);
 
-            // Parse answers based on request type
             $answersData = $this->parseAnswersFromRequest($request);
             
             if (empty($answersData)) {
@@ -74,7 +72,6 @@ class CertificateAnswerController extends Controller
                 ], 400);
             }
 
-            // Validate answers structure
             $validator = $this->validateAnswers($answersData, $path);
             
             if ($validator->fails()) {
@@ -90,10 +87,8 @@ class CertificateAnswerController extends Controller
                 ], 422);
             }
 
-            // Process file uploads if present
             $answersData = $this->processFileUploads($answersData, $request, $path, $organization->id);
 
-            // Save to repository
             $result = $this->repo->saveAnswers(
                 $organization->id, 
                 ['answers' => $answersData], 
@@ -169,7 +164,6 @@ class CertificateAnswerController extends Controller
                 'user_id' => $request->user()?->id
             ]);
 
-            // Validate path
             if (!$this->isValidPath($path)) {
                 return response()->json([
                     'success' => false,
@@ -188,7 +182,6 @@ class CertificateAnswerController extends Controller
                 ], 404);
             }
 
-            // Validate request
             $validator = Validator::make($request->all(), [
                 'answers' => 'required|array|min:1',
                 'answers.*.question_id' => 'required|integer|exists:certificate_questions,id',
@@ -264,7 +257,6 @@ class CertificateAnswerController extends Controller
     {
         $answers = [];
 
-        // Log all incoming data for debugging
         Log::info('Request data received', [
             'all_input' => $request->all(),
             'all_files' => $request->allFiles(),
@@ -274,33 +266,26 @@ class CertificateAnswerController extends Controller
             'method' => $request->method(),
         ]);
 
-        // Check if answers are in JSON format
         if ($request->has('answers') && is_array($request->input('answers'))) {
             $answersInput = $request->input('answers');
             
-            // Check if it's already a proper array of answers
             if (isset($answersInput[0]) && is_array($answersInput[0])) {
                 $answers = $answersInput;
                 Log::info('Parsed answers from JSON/nested array', ['count' => count($answers)]);
                 
-                // Handle file uploads for nested arrays
                 foreach ($answers as $index => $answer) {
                     if ($request->hasFile("answers.{$index}.attachment")) {
                         $answers[$index]['attachment_file'] = $request->file("answers.{$index}.attachment");
                     }
                 }
             } else {
-                // Single answer format
                 $answers = [$answersInput];
                 Log::info('Parsed single answer from JSON', ['count' => 1]);
             }
-        } 
-        // Try alternative form-data formats
-        else {
+        } else {
             $formAnswers = [];
             $allInput = $request->all();
             
-            // Format 1: answers[0][question_id] using dot notation
             $index = 0;
             while ($request->has("answers.{$index}.question_id")) {
                 $answer = [
@@ -320,7 +305,6 @@ class CertificateAnswerController extends Controller
                 $index++;
             }
             
-            // Format 2: Direct key format (question_id, selected_option at root level)
             if (empty($formAnswers) && isset($allInput['question_id'])) {
                 $formAnswers[] = [
                     'question_id' => $allInput['question_id'],
@@ -331,7 +315,6 @@ class CertificateAnswerController extends Controller
                 Log::info('Parsed single answer from root-level form-data');
             }
             
-            // Format 3: Check if raw 'answers' exists as nested array from form-data
             if (empty($formAnswers) && isset($allInput['answers']) && is_array($allInput['answers'])) {
                 foreach ($allInput['answers'] as $idx => $answerData) {
                     if (isset($answerData['question_id']) && isset($answerData['selected_option'])) {
@@ -386,7 +369,7 @@ class CertificateAnswerController extends Controller
                 'integer',
                 'exists:certificate_questions,id',
                 function ($attribute, $value, $fail) use ($path) {
-                    $question = \App\Models\CertificateQuestion::find($value);
+                    $question = CertificateQuestion::find($value);
                     if ($question && $question->path !== $path) {
                         $fail("السؤال رقم {$value} لا ينتمي إلى مسار: {$path}");
                     }
@@ -394,7 +377,7 @@ class CertificateAnswerController extends Controller
             ],
             '*.selected_option' => 'required|string',
             '*.attachment_url' => 'nullable|string|url',
-            '*.attachment_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120', // 5MB
+            '*.attachment_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
         ];
 
         return Validator::make($answers, $rules);
@@ -406,7 +389,6 @@ class CertificateAnswerController extends Controller
     private function processFileUploads(array $answers, Request $request, string $path, int $organizationId): array
     {
         foreach ($answers as $index => &$answer) {
-            // Skip if no file
             if (!isset($answer['attachment_file'])) {
                 continue;
             }
@@ -420,7 +402,6 @@ class CertificateAnswerController extends Controller
                     'size' => $file->getSize()
                 ]);
 
-                // Store file
                 $filePath = $file->store("certificate_attachments/{$path}/{$organizationId}", 'public');
                 
                 if (!$filePath) {
@@ -430,13 +411,11 @@ class CertificateAnswerController extends Controller
                     throw new \Exception('فشل في حفظ الملف');
                 }
 
-                // Generate URL
                 $fileUrl = Storage::disk('public')->url($filePath);
                 
-                // Add URL to answer
+                $answer['attachment_path'] = $filePath;
                 $answer['attachment_url'] = $fileUrl;
                 
-                // Remove file object from array
                 unset($answer['attachment_file']);
 
                 Log::info('File uploaded successfully', [
@@ -451,11 +430,7 @@ class CertificateAnswerController extends Controller
                     'error' => $e->getMessage()
                 ]);
                 
-                // Remove file object and don't set URL if upload failed
                 unset($answer['attachment_file']);
-                
-                // Optionally throw or continue
-                // throw new \Exception("فشل في رفع الملف للسؤال {$answer['question_id']}: " . $e->getMessage());
             }
         }
 

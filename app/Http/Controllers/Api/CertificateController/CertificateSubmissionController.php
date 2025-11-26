@@ -28,7 +28,7 @@ class CertificateSubmissionController extends Controller
         if (!$this->isValidPath($path)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid path. Allowed: strategic, operational, hr'
+                'message' => 'مسار غير صحيح. المسارات المسموحة: strategic, operational, hr'
             ], 400);
         }
 
@@ -37,7 +37,7 @@ class CertificateSubmissionController extends Controller
         if (!$organization) {
             return response()->json([
                 'success' => false,
-                'message' => 'Organization not found for this user'
+                'message' => 'المنظمة غير موجودة لهذا المستخدم'
             ], 404);
         }
 

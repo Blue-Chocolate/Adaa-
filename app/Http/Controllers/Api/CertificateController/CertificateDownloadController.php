@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\CertificateController;
 
 use App\Http\Controllers\Controller;
 use App\Models\CertificateApproval;
@@ -25,17 +25,13 @@ class CertificateDownloadController extends Controller
 
     /**
      * Download certificate data/PDF for a specific path
-     * 
-     * @param Request $request
-     * @param string $path
-     * @return \Illuminate\Http\JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
      */
     public function downloadPath(Request $request, string $path)
     {
         if (!$this->isValidPath($path)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid path. Allowed: strategic, operational, hr'
+                'message' => 'مسار غير صحيح. المسارات المسموحة: strategic, operational, hr'
             ], 400);
         }
 
@@ -44,11 +40,10 @@ class CertificateDownloadController extends Controller
         if (!$organization) {
             return response()->json([
                 'success' => false,
-                'message' => 'Organization not found for this user'
+                'message' => 'المنظمة غير موجودة لهذا المستخدم'
             ], 404);
         }
 
-        // Check if the specific path is approved using the new approval table
         $approval = CertificateApproval::where('organization_id', $organization->id)
             ->where('path', $path)
             ->first();
@@ -56,26 +51,23 @@ class CertificateDownloadController extends Controller
         if (!$approval || !$approval->approved) {
             return response()->json([
                 'success' => false,
-                'message' => "The {$path} certificate has not been approved yet. Please wait for admin approval."
+                'message' => "شهادة {$path} لم تتم الموافقة عليها بعد. يرجى انتظار موافقة المسؤول."
             ], 403);
         }
 
         try {
-            // Check if a certificate PDF has been generated
             $certificate = IssuedCertificate::where('organization_id', $organization->id)
                 ->where('path', $path)
                 ->latest('issued_at')
                 ->first();
 
             if ($certificate && $certificate->pdf_path && Storage::exists($certificate->pdf_path)) {
-                // Download the generated PDF certificate
                 return response()->download(
                     Storage::path($certificate->pdf_path),
                     "certificate_{$path}_{$organization->name}.pdf"
                 );
             }
 
-            // Fallback: Return JSON data if PDF not yet generated
             $data = $this->repo->downloadPathData($organization->id, $path);
 
             return response()->json([
@@ -99,9 +91,6 @@ class CertificateDownloadController extends Controller
 
     /**
      * Download overall certificate data (all approved paths)
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function downloadOverall(Request $request)
     {
@@ -110,11 +99,10 @@ class CertificateDownloadController extends Controller
         if (!$organization) {
             return response()->json([
                 'success' => false,
-                'message' => 'Organization not found for this user'
+                'message' => 'المنظمة غير موجودة لهذا المستخدم'
             ], 404);
         }
 
-        // Get all approved paths from the approval table
         $approvedPaths = CertificateApproval::where('organization_id', $organization->id)
             ->where('approved', true)
             ->pluck('path')
@@ -123,15 +111,13 @@ class CertificateDownloadController extends Controller
         if (empty($approvedPaths)) {
             return response()->json([
                 'success' => false,
-                'message' => 'No certificates have been approved yet. Please wait for admin approval.'
+                'message' => 'لم تتم الموافقة على أي شهادات بعد. يرجى انتظار موافقة المسؤول.'
             ], 403);
         }
 
         try {
-            // Get data for all approved paths
             $data = $this->repo->downloadOverallData($organization->id, $approvedPaths);
 
-            // Get all issued certificates for this organization
             $certificates = IssuedCertificate::where('organization_id', $organization->id)
                 ->whereIn('path', $approvedPaths)
                 ->orderBy('issued_at', 'desc')
@@ -172,9 +158,6 @@ class CertificateDownloadController extends Controller
 
     /**
      * Get certificate status for all paths
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function getStatus(Request $request)
     {
@@ -183,7 +166,7 @@ class CertificateDownloadController extends Controller
         if (!$organization) {
             return response()->json([
                 'success' => false,
-                'message' => 'Organization not found for this user'
+                'message' => 'المنظمة غير موجودة لهذا المستخدم'
             ], 404);
         }
 
@@ -226,17 +209,13 @@ class CertificateDownloadController extends Controller
 
     /**
      * Submit a path for approval (organization initiates)
-     * 
-     * @param Request $request
-     * @param string $path
-     * @return \Illuminate\Http\JsonResponse
      */
     public function submitForApproval(Request $request, string $path)
     {
         if (!$this->isValidPath($path)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid path'
+                'message' => 'مسار غير صحيح'
             ], 400);
         }
 
@@ -245,16 +224,15 @@ class CertificateDownloadController extends Controller
         if (!$organization) {
             return response()->json([
                 'success' => false,
-                'message' => 'Organization not found'
+                'message' => 'المنظمة غير موجودة'
             ], 404);
         }
 
-        // Check if organization has a score for this path
         $scoreField = "certificate_{$path}_score";
         if (is_null($organization->$scoreField)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Please complete the assessment before submitting for approval'
+                'message' => 'يرجى إكمال التقييم قبل الإرسال للموافقة'
             ], 400);
         }
 
@@ -272,7 +250,7 @@ class CertificateDownloadController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Certificate submitted for admin approval',
+                'message' => 'تم إرسال الشهادة لموافقة المسؤول',
                 'data' => [
                     'path' => $path,
                     'submitted_at' => $approval->submitted_at,
@@ -289,9 +267,6 @@ class CertificateDownloadController extends Controller
 
     /**
      * Check if path is valid
-     * 
-     * @param string $path
-     * @return bool
      */
     private function isValidPath(string $path): bool
     {

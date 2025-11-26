@@ -16,8 +16,6 @@ class CertificateSummaryController extends Controller
 
     /**
      * Get authenticated organization's certificate progress summary
-     * 
-     * @return \Illuminate\Http\JsonResponse
      */
     public function summary(Request $request)
     {
@@ -115,7 +113,6 @@ class CertificateSummaryController extends Controller
         if ($pathData['completed']) {
             return 'مكتمل';
         } elseif ($answeredPercentage >= 100) {
-            // All questions answered but not submitted yet
             return 'يتم التقييم';
         } elseif ($pathData['answered'] > 0) {
             return 'قيد المراجعة';
