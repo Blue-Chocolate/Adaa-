@@ -15,9 +15,9 @@ class ViewCertificateAnswer extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            // Removed edit/delete as we're viewing aggregated data
-        ];
+    return [
+        Actions\EditAction::make(),
+    ];
     }
 
     public function infolist(Infolist $infolist): Infolist

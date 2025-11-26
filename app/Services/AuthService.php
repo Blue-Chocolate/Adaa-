@@ -68,7 +68,8 @@ class AuthService
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'],
-                'password' => Hash::make($data['password'])
+                'password' => Hash::make($data['password']),
+                'role' => $data['role'] ?? 'donor',
             ]);
 
             // Send verification email

@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->string('phone')->nullable();
             $table->string('address')->nullable();
+            $table->string('logo_path')->nullable();
             $table->string('license_number')->nullable();
             $table->string('executive_name')->nullable();
             $table->enum('status', ['approved', 'pending', 'decline'])->default('pending');
@@ -39,22 +40,6 @@ return new class extends Migration
             $table->decimal('certificate_strategic_score', 8, 2)->nullable();
             $table->decimal('certificate_operational_score', 8, 2)->nullable();
             $table->decimal('certificate_hr_score', 8, 2)->nullable();
-
-            // Submission status (by organization)
-            $table->boolean('certificate_strategic_submitted')->default(false)
-                ->comment('Whether strategic path has been submitted for evaluation');
-            $table->boolean('certificate_operational_submitted')->default(false)
-                ->comment('Whether operational path has been submitted for evaluation');
-            $table->boolean('certificate_hr_submitted')->default(false)
-                ->comment('Whether HR path has been submitted for evaluation');
-            
-            // Admin approval status (by admin after reviewing)
-            $table->boolean('certificate_strategic_approved')->default(false)
-                ->comment('Whether admin has approved the strategic path results');
-            $table->boolean('certificate_operational_approved')->default(false)
-                ->comment('Whether admin has approved the operational path results');
-            $table->boolean('certificate_hr_approved')->default(false)
-                ->comment('Whether admin has approved the HR path results');
 
             $table->timestamps();
         });

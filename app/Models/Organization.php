@@ -20,6 +20,7 @@ class Organization extends Model
         'phone',
         'status',
         'address',
+        'logo_path',
         'license_number',
         'executive_name',
         'website',
@@ -78,10 +79,7 @@ class Organization extends Model
     /**
      * Get certificate answers for the organization
      */
-    public function certificateAnswers(): HasMany
-    {
-        return $this->hasMany(CertificateAnswer::class);
-    }
+
 
     /**
      * Update shield rank based on percentage
@@ -197,5 +195,55 @@ class Organization extends Model
         }
 
         return $count;
+    }
+      public function certificateApprovals(): HasMany
+    {
+        return $this->hasMany(CertificateApproval::class);
+    }
+
+    /**
+     * Get all issued certificates for this organization
+     */
+    public function issuedCertificates(): HasMany
+    {
+        return $this->hasMany(IssuedCertificate::class);
+    }
+
+    /**
+     * Get certificate answers
+     */
+    public function certificateAnswers(): HasMany
+    {
+        return $this->hasMany(CertificateAnswer::class);
+    }
+
+    /**
+     * Get approved certificates only
+     */
+    public function approvedCertificates(): HasMany
+    {
+        return $this->hasMany(IssuedCertificate::class);
+    }
+
+    /**
+     * Check if a specific path is approved
+     */
+    public function hasApprovedPath(string $path): bool
+    {
+        return $this->certificateApprovals()
+            ->where('path', $path)
+            ->where('approved', true)
+            ->exists();
+    }
+
+    /**
+     * Get all approved paths
+     */
+    public function getApprovedPathsAttribute(): array
+    {
+        return $this->certificateApprovals()
+            ->where('approved', true)
+            ->pluck('path')
+            ->toArray();
     }
 }
