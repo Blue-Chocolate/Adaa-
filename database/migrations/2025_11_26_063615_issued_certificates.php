@@ -15,6 +15,7 @@ return new class extends Migration
     $table->id();
     $table->string('certificate_number')->unique();
     $table->foreignId('organization_id')->constrained()->onDelete('cascade');
+    
     $table->enum('path', ['strategic', 'operational', 'hr']);
     
     // Snapshot at issuance (so changes to org don't affect certificate)
