@@ -62,8 +62,6 @@ class EmailVerificationService
             $user->email_verification_sent_at = now();
             $user->save();
 
-            // Generate verification URL
-
             // Generate verification URL (no /auth prefix)
             $verificationUrl = url("/api/email/verify?token={$token}");
 
@@ -125,8 +123,6 @@ class EmailVerificationService
 
             // Check token expiration
             if ($user->email_verification_sent_at) {
-                $expiresAt = Carbon::parse($user->email_verification_sent_at)->addMinutes(1);
-
                 $expiresAt = Carbon::parse($user->email_verification_sent_at)
                     ->addMinutes(self::TOKEN_EXPIRY_MINUTES);
 
@@ -229,16 +225,24 @@ class EmailVerificationService
             // Check rate limiting (prevent spam)
             if ($user->email_verification_sent_at) {
                 $lastSent = Carbon::parse($user->email_verification_sent_at);
-                $minutesSinceLastSent = now()->diffInMinutes($lastSent);
+                $cooldownEndsAt = $lastSent->copy()->addMinutes(self::RESEND_COOLDOWN_MINUTES);
                 
-                if ($minutesSinceLastSent < self::RESEND_COOLDOWN_MINUTES) {
-                    $waitTime = self::RESEND_COOLDOWN_MINUTES - $minutesSinceLastSent;
+                // Check if we're still within the cooldown period
+                if (now()->lessThan($cooldownEndsAt)) {
+                    // Calculate remaining wait time in minutes (rounded up)
+                    $waitTime = now()->diffInMinutes($cooldownEndsAt, false);
+                    if ($waitTime <= 0) {
+                        $waitTime = 1; // Show at least 1 minute
+                    }
+                    
                     Log::warning('Resend rate limit hit', [
                         'user_id' => $user->id,
                         'email' => $email,
-                        'minutes_since_last' => $minutesSinceLastSent,
+                        'last_sent' => $lastSent->toDateTimeString(),
+                        'cooldown_ends' => $cooldownEndsAt->toDateTimeString(),
                         'wait_minutes' => $waitTime
                     ]);
+                    
                     return [
                         'success' => false,
                         'message' => "Please wait {$waitTime} minute(s) before requesting another verification email"

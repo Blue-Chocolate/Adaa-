@@ -12,7 +12,24 @@ class CreateCertificateTemplate extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Ensure default structure if not provided
+        // Convert repeater list → keyed JSON for saving
+        if (isset($data['borders']) && is_array($data['borders'])) {
+            $keyed = [];
+
+            foreach ($data['borders'] as $item) {
+                if (isset($item['rank'])) {
+                    $keyed[$item['rank']] = [
+                        'color' => $item['color'] ?? '#000000',
+                        'width' => (int)($item['width'] ?? 8),
+                        'style' => $item['style'] ?? 'solid',
+                    ];
+                }
+            }
+
+            $data['borders'] = $keyed;
+        }
+
+        // Set default borders if none provided
         if (empty($data['borders'])) {
             $data['borders'] = [
                 'diamond' => ['color' => '#10b981', 'width' => 8, 'style' => 'solid'],
@@ -23,5 +40,10 @@ class CreateCertificateTemplate extends CreateRecord
         }
 
         return $data;
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
     }
 }

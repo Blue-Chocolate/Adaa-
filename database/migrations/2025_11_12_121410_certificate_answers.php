@@ -17,6 +17,7 @@ return new class extends Migration
             $table->decimal('final_points', 8, 2)->nullable(); // Points × weight
             $table->string('attachment_path')->nullable();
             $table->string('attachment_url')->nullable();
+            $table->boolean('approved')->default(false);
             $table->timestamps();
         });
     }

@@ -52,7 +52,20 @@ class CertificateTemplateResource extends Resource
                         Forms\Components\FileUpload::make('background_image')
                             ->label('Background Image (Optional)')
                             ->image()
-                            ->directory('certificate-backgrounds'),
+                            ->directory('certificate-backgrounds')
+                            ->visibility('public')
+                            ->imageEditor()
+                            ->imageEditorAspectRatios([
+                                '16:9',
+                                '4:3',
+                                '1:1',
+                            ])
+                            ->imageEditorMode(2) // Free crop mode
+                            ->imageEditorEmptyFillColor('#ffffff')
+                            ->imageEditorViewportWidth('1920')
+                            ->imageEditorViewportHeight('1080')
+                            ->maxSize(5120) // 5MB
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp']),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Border Settings')
@@ -68,7 +81,8 @@ class CertificateTemplateResource extends Resource
                                         'bronze' => 'Bronze',
                                     ])
                                     ->required()
-                                    ->distinct(),
+                                    ->distinct()
+                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems(),
                                 
                                 Forms\Components\ColorPicker::make('color')
                                     ->required()
@@ -78,7 +92,9 @@ class CertificateTemplateResource extends Resource
                                     ->numeric()
                                     ->required()
                                     ->default(8)
-                                    ->suffix('px'),
+                                    ->suffix('px')
+                                    ->minValue(1)
+                                    ->maxValue(50),
                                 
                                 Forms\Components\Select::make('style')
                                     ->options([
@@ -91,31 +107,10 @@ class CertificateTemplateResource extends Resource
                                     ->default('solid'),
                             ])
                             ->columns(4)
-                            ->defaultItems(4)
+                            ->defaultItems(0)
                             ->columnSpanFull()
-                            ->mutateDeformedStateUsing(function ($state) {
-                                // Convert to keyed array by rank
-                                $keyed = [];
-                                foreach ($state as $item) {
-                                    $keyed[$item['rank']] = [
-                                        'color' => $item['color'],
-                                        'width' => $item['width'],
-                                        'style' => $item['style'],
-                                    ];
-                                }
-                                return $keyed;
-                            })
-                            ->mutateRelationshipDataUsing(function (array $data) {
-                                // Convert back to array for repeater
-                                $array = [];
-                                foreach ($data as $rank => $settings) {
-                                    $array[] = [
-                                        'rank' => $rank,
-                                        ...$settings
-                                    ];
-                                }
-                                return $array;
-                            }),
+                            ->addActionLabel('Add Border Configuration')
+                            ->reorderable(false),
                     ]),
 
                 Forms\Components\Section::make('Logo Settings')
@@ -136,7 +131,9 @@ class CertificateTemplateResource extends Resource
                             ->numeric()
                             ->default(80)
                             ->suffix('px')
-                            ->required(),
+                            ->required()
+                            ->minValue(20)
+                            ->maxValue(500),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Text Elements')
@@ -146,12 +143,13 @@ class CertificateTemplateResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('id')
                                     ->required()
-                                    ->unique()
-                                    ->label('Element ID'),
+                                    ->label('Element ID')
+                                    ->hint('Use unique identifier (e.g., title, subtitle, body)'),
                                 
                                 Forms\Components\Textarea::make('content')
                                     ->required()
                                     ->label('Content')
+                                    ->rows(3)
                                     ->hint('Use placeholders: [Organization Name], [Rank], [Score], [License Number], [Certificate Number], [Date], [Path], [Issued By]'),
                                 
                                 Forms\Components\Grid::make(2)
@@ -161,14 +159,18 @@ class CertificateTemplateResource extends Resource
                                             ->required()
                                             ->default(50)
                                             ->suffix('%')
-                                            ->label('X Position'),
+                                            ->label('X Position')
+                                            ->minValue(0)
+                                            ->maxValue(100),
                                         
                                         Forms\Components\TextInput::make('y')
                                             ->numeric()
                                             ->required()
                                             ->default(50)
                                             ->suffix('%')
-                                            ->label('Y Position'),
+                                            ->label('Y Position')
+                                            ->minValue(0)
+                                            ->maxValue(100),
                                     ]),
                                 
                                 Forms\Components\Grid::make(3)
@@ -178,7 +180,9 @@ class CertificateTemplateResource extends Resource
                                             ->required()
                                             ->default(16)
                                             ->suffix('px')
-                                            ->label('Font Size'),
+                                            ->label('Font Size')
+                                            ->minValue(8)
+                                            ->maxValue(200),
                                         
                                         Forms\Components\Select::make('fontFamily')
                                             ->options([
@@ -215,9 +219,11 @@ class CertificateTemplateResource extends Resource
                                     ]),
                             ])
                             ->columns(1)
-                            ->defaultItems(1)
+                            ->defaultItems(0)
                             ->columnSpanFull()
-                            ->collapsible(),
+                            ->collapsible()
+                            ->itemLabel(fn (array $state): ?string => $state['id'] ?? null)
+                            ->addActionLabel('Add Text Element'),
                     ]),
             ]);
     }
@@ -230,18 +236,30 @@ class CertificateTemplateResource extends Resource
                     ->searchable()
                     ->sortable(),
                 
-                Tables\Columns\BadgeColumn::make('style')
-                    ->colors([
-                        'primary' => 'modern',
-                        'success' => 'classic',
-                        'warning' => 'elegant',
-                    ]),
+                Tables\Columns\TextColumn::make('style')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'modern' => 'info',
+                        'classic' => 'success',
+                        'elegant' => 'warning',
+                        default => 'gray',
+                    }),
                 
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()
                     ->label('Active'),
                 
+                Tables\Columns\ImageColumn::make('background_image')
+                    ->label('Background')
+                    ->square()
+                    ->toggleable(),
+                
                 Tables\Columns\TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                
+                Tables\Columns\TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -256,13 +274,17 @@ class CertificateTemplateResource extends Resource
                 
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Active')
-                    ->boolean(),
+                    ->boolean()
+                    ->trueLabel('Active only')
+                    ->falseLabel('Inactive only')
+                    ->native(false),
             ])
             ->actions([
                 Tables\Actions\Action::make('preview')
                     ->icon('heroicon-o-eye')
                     ->url(fn (CertificateTemplate $record) => route('filament.admin.resources.certificate-templates.preview', $record))
-                    ->openUrlInNewTab(),
+                    ->openUrlInNewTab()
+                    ->color('info'),
                 
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
