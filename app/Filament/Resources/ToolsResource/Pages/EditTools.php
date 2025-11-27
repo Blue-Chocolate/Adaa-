@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Filament\Resources\ToolResource\Pages;
+namespace App\Filament\Resources\ToolsResource\Pages;
 
-use App\Filament\Resources\ToolResource;
+use App\Filament\Resources\ToolsResource;
 use Filament\Resources\Pages\EditRecord;
 
-class EditTool extends EditRecord
+class EditTools extends EditRecord
 {
-    protected static string $resource = ToolResource::class;
+    protected static string $resource = ToolsResource::class;
 }

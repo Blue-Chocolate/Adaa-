@@ -1,6 +1,5 @@
-    <?php
-
-    namespace App\Filament\Resources;
+<?php
+namespace App\Filament\Resources;
 
     use App\Filament\Resources\CertificateAnswerResource\Pages;
     use App\Models\CertificateAnswer;

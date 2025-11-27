@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ToolResource\Pages;
+use App\Filament\Resources\ToolsResource\Pages;
 use App\Models\Tool;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -12,7 +12,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 
-class ToolResource extends Resource
+class ToolsResource extends Resource
 {
     protected static ?string $model = Tool::class;
 
@@ -85,8 +85,8 @@ class ToolResource extends Resource
     {
         return [
             'index'  => Pages\ListTools::route('/'),
-            'create' => Pages\CreateTool::route('/create'),
-            'edit'   => Pages\EditTool::route('/{record}/edit'),
+            'create' => Pages\CreateTools::route('/create'),
+            'edit'   => Pages\EditTools::route('/{record}/edit'),
         ];
     }
 }
