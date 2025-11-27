@@ -3,7 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
-use App\Filament\Resources\UserResource\RelationManagers\SubscriptionRequestsRelationManager;
+use App\Filament\Resources\UserResource\SubscriptionRequestsRelationManager\SubscriptionRequestsRelationManager;
 use App\Models\User;
 use App\Models\Plan;
 use Filament\Forms;
