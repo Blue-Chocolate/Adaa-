@@ -713,15 +713,17 @@ class OrganizationResource extends Resource
         ];
     }
 
-    public static function getPages(): array
-    {
-        return [
-            'index' => Pages\ListOrganizations::route('/'),
-            'create' => Pages\CreateOrganization::route('/create'),
-            'view' => Pages\ViewOrganization::route('/{record}'),
-            'edit' => Pages\EditOrganization::route('/{record}/edit'),
-        ];
-    }
+ public static function getPages(): array
+{
+    return [
+        'index' => Pages\ListOrganizations::route('/'),
+        'create' => Pages\CreateOrganization::route('/create'),
+        'view' => Pages\ViewOrganization::route('/{record}'),
+        'edit' => Pages\EditOrganization::route('/{record}/edit'),
+        'view-certificate' => Pages\ViewCertificateSubmission::route('/{record}/certificate'),
+        'view-shield' => Pages\ViewShieldSubmission::route('/{record}/shield'),
+    ];
+}
 
     public static function getNavigationBadge(): ?string
     {
