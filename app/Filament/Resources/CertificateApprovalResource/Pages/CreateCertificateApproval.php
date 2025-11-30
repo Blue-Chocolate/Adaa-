@@ -8,9 +8,4 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateCertificateApproval extends CreateRecord
 {
     protected static string $resource = CertificateApprovalResource::class;
-
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
-    }
 }

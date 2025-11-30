@@ -6,6 +6,7 @@ use App\Filament\Resources\CertificateApprovalResource\Pages;
 use App\Models\CertificateApproval;
 use App\Models\IssuedCertificate;
 use App\Jobs\GenerateCertificatePDF;
+use App\Helpers\CertificateHelper;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -14,7 +15,6 @@ use Filament\Tables\Table;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class CertificateApprovalResource extends Resource
 {
@@ -44,11 +44,7 @@ class CertificateApprovalResource extends Resource
 
                         Forms\Components\Select::make('path')
                             ->label('Certificate Path')
-                            ->options([
-                                'strategic' => 'Strategic',
-                                'operational' => 'Operational',
-                                'hr' => 'HR',
-                            ])
+                            ->options(CertificateHelper::getPaths())
                             ->required()
                             ->disabled(fn ($record) => $record !== null),
                     ])
@@ -73,7 +69,7 @@ class CertificateApprovalResource extends Resource
                                 }
                                 $scoreField = "certificate_{$record->path}_score";
                                 $score = $record->organization->$scoreField ?? 0;
-                                $rank = self::calculateRank($score);
+                                $rank = CertificateHelper::calculateRank($score);
                                 return "{$score} points - " . ucfirst($rank) . " Rank";
                             }),
                     ])
@@ -122,13 +118,8 @@ class CertificateApprovalResource extends Resource
                 Tables\Columns\TextColumn::make('path')
                     ->label('Path')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'strategic' => 'info',
-                        'operational' => 'warning',
-                        'hr' => 'success',
-                        default => 'gray',
-                    })
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                    ->color(fn (string $state): string => CertificateHelper::getPathColor($state))
+                    ->formatStateUsing(fn (string $state): string => CertificateHelper::formatPathName($state))
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('score')
@@ -147,16 +138,10 @@ class CertificateApprovalResource extends Resource
                     ->getStateUsing(function ($record) {
                         $scoreField = "certificate_{$record->path}_score";
                         $score = $record->organization->$scoreField ?? 0;
-                        return self::calculateRank($score);
+                        return CertificateHelper::calculateRank($score);
                     })
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'diamond' => 'success',
-                        'gold' => 'warning',
-                        'silver' => 'info',
-                        'bronze' => 'danger',
-                        default => 'gray',
-                    })
+                    ->color(fn (string $state): string => CertificateHelper::getRankColor($state))
                     ->formatStateUsing(fn (string $state): string => ucfirst($state)),
 
                 Tables\Columns\IconColumn::make('submitted')
@@ -195,11 +180,7 @@ class CertificateApprovalResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('path')
                     ->label('Path')
-                    ->options([
-                        'strategic' => 'Strategic',
-                        'operational' => 'Operational',
-                        'hr' => 'HR',
-                    ]),
+                    ->options(CertificateHelper::getPaths()),
 
                 Tables\Filters\Filter::make('submitted')
                     ->label('Submitted Only')
@@ -251,11 +232,11 @@ class CertificateApprovalResource extends Resource
                                 // Get score
                                 $scoreField = "certificate_{$record->path}_score";
                                 $score = $organization->$scoreField ?? 0;
-                                $rank = self::calculateRank($score);
+                                $rank = CertificateHelper::calculateRank($score);
 
                                 // Create certificate
                                 $certificate = IssuedCertificate::create([
-                                    'certificate_number' => self::generateCertificateNumber($organization, $record->path),
+                                    'certificate_number' => CertificateHelper::generateCertificateNumber($organization, $record->path),
                                     'organization_id' => $organization->id,
                                     'path' => $record->path,
                                     'organization_name' => $organization->name,
@@ -329,63 +310,65 @@ class CertificateApprovalResource extends Resource
                     ])),
             ])
             ->bulkActions([
-                Tables\Actions\BulkAction::make('bulk_approve')
-                    ->label('Approve Selected')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->modalHeading('Approve Multiple Certificates')
-                    ->modalDescription('Are you sure you want to approve all selected certificates?')
-                    ->action(function ($records) {
-                        $approved = 0;
-                        $failed = 0;
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('bulk_approve')
+                        ->label('Approve Selected')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Approve Multiple Certificates')
+                        ->modalDescription('Are you sure you want to approve all selected certificates?')
+                        ->action(function ($records) {
+                            $approved = 0;
+                            $failed = 0;
 
-                        foreach ($records as $record) {
-                            if (!$record->submitted || $record->approved) {
-                                $failed++;
-                                continue;
+                            foreach ($records as $record) {
+                                if (!$record->submitted || $record->approved) {
+                                    $failed++;
+                                    continue;
+                                }
+
+                                try {
+                                    DB::transaction(function() use ($record) {
+                                        $organization = $record->organization;
+                                        
+                                        $record->update([
+                                            'approved' => true,
+                                            'approved_at' => now(),
+                                            'approved_by' => auth()->id(),
+                                        ]);
+
+                                        $scoreField = "certificate_{$record->path}_score";
+                                        $score = $organization->$scoreField ?? 0;
+
+                                        $certificate = IssuedCertificate::create([
+                                            'certificate_number' => CertificateHelper::generateCertificateNumber($organization, $record->path),
+                                            'organization_id' => $organization->id,
+                                            'path' => $record->path,
+                                            'organization_name' => $organization->name,
+                                            'organization_logo_path' => $organization->logo_path,
+                                            'score' => $score,
+                                            'rank' => CertificateHelper::calculateRank($score),
+                                            'issued_at' => now(),
+                                            'issued_by' => auth()->id(),
+                                        ]);
+
+                                        GenerateCertificatePDF::dispatch($certificate);
+                                    });
+
+                                    $approved++;
+                                } catch (\Exception $e) {
+                                    $failed++;
+                                }
                             }
 
-                            try {
-                                DB::transaction(function() use ($record) {
-                                    $organization = $record->organization;
-                                    
-                                    $record->update([
-                                        'approved' => true,
-                                        'approved_at' => now(),
-                                        'approved_by' => auth()->id(),
-                                    ]);
-
-                                    $scoreField = "certificate_{$record->path}_score";
-                                    $score = $organization->$scoreField ?? 0;
-
-                                    $certificate = IssuedCertificate::create([
-                                        'certificate_number' => self::generateCertificateNumber($organization, $record->path),
-                                        'organization_id' => $organization->id,
-                                        'path' => $record->path,
-                                        'organization_name' => $organization->name,
-                                        'organization_logo_path' => $organization->logo_path,
-                                        'score' => $score,
-                                        'rank' => self::calculateRank($score),
-                                        'issued_at' => now(),
-                                        'issued_by' => auth()->id(),
-                                    ]);
-
-                                    GenerateCertificatePDF::dispatch($certificate);
-                                });
-
-                                $approved++;
-                            } catch (\Exception $e) {
-                                $failed++;
-                            }
-                        }
-
-                        Notification::make()
-                            ->success()
-                            ->title('Bulk Approval Complete')
-                            ->body("Approved: {$approved}, Failed: {$failed}")
-                            ->send();
-                    }),
+                            Notification::make()
+                                ->success()
+                                ->title('Bulk Approval Complete')
+                                ->body("Approved: {$approved}, Failed: {$failed}")
+                                ->send();
+                        }),
+                ]),
             ])
             ->defaultSort('submitted_at', 'desc');
     }
@@ -415,24 +398,5 @@ class CertificateApprovalResource extends Resource
     public static function getNavigationBadgeColor(): ?string
     {
         return 'warning';
-    }
-
-    protected static function calculateRank(float $score): string
-    {
-        if ($score >= 90) return 'diamond';
-        if ($score >= 75) return 'gold';
-        if ($score >= 60) return 'silver';
-        return 'bronze';
-    }
-
-    protected static function generateCertificateNumber($organization, string $path): string
-    {
-        $pathCode = strtoupper(substr($path, 0, 3));
-        $year = date('Y');
-        $orgId = str_pad($organization->id, 4, '0', STR_PAD_LEFT);
-        $sequence = IssuedCertificate::whereYear('created_at', $year)->count() + 1;
-        $seqPadded = str_pad($sequence, 4, '0', STR_PAD_LEFT);
-        
-        return "CERT-{$pathCode}-{$year}-{$orgId}-{$seqPadded}";
     }
 }

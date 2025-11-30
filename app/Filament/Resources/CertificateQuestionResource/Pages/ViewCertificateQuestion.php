@@ -7,7 +7,6 @@ use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components;
-use Filament\Tables\Columns\IconColumn;
 
 class ViewCertificateQuestion extends ViewRecord
 {
@@ -101,10 +100,52 @@ class ViewCertificateQuestion extends ViewRecord
 
                 Components\Section::make('الخيارات والنقاط')
                     ->schema([
-                        Components\ViewField::make('options_table')
+                        Components\RepeatableEntry::make('options_display')
                             ->label('')
-                            ->view('filament.infolists.question-options-table'),
-                    ]),
+                            ->schema([
+                                Components\TextEntry::make('option')
+                                    ->label('الخيار')
+                                    ->weight('medium'),
+                                
+                                Components\TextEntry::make('points')
+                                    ->label('النقاط')
+                                    ->badge()
+                                    ->color('success')
+                                    ->suffix(' نقطة'),
+                            ])
+                            ->columns(2)
+                            ->state(function ($record) {
+                                $options = json_decode($record->options, true) ?? [];
+                                $points = json_decode($record->points_mapping, true) ?? [];
+                                
+                                $result = [];
+                                foreach ($options as $option) {
+                                    $result[] = [
+                                        'option' => $option,
+                                        'points' => $points[$option] ?? 0,
+                                    ];
+                                }
+                                
+                                return $result;
+                            }),
+                        
+                        Components\TextEntry::make('total_options')
+                            ->label('إجمالي الخيارات')
+                            ->badge()
+                            ->color('info')
+                            ->state(fn($record) => count(json_decode($record->options, true) ?? [])),
+                        
+                        Components\TextEntry::make('max_points')
+                            ->label('أقصى نقاط ممكنة')
+                            ->badge()
+                            ->color('success')
+                            ->suffix(' نقطة')
+                            ->state(function ($record) {
+                                $points = json_decode($record->points_mapping, true) ?? [];
+                                return !empty($points) ? max(array_values($points)) : 0;
+                            }),
+                    ])
+                    ->columns(2),
 
                 Components\Section::make('معلومات إضافية')
                     ->schema([

@@ -1,15 +1,13 @@
-<?php 
-
+<?php
 
 namespace App\Filament\Resources\CertificateApprovalResource\Pages;
 
 use App\Filament\Resources\CertificateApprovalResource;
-use App\Models\CertificateAnswer;
+use App\Helpers\CertificateHelper;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
-use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Support\Enums\FontWeight;
+use Filament\Infolists\Components;
 
 class ViewCertificateApproval extends ViewRecord
 {
@@ -26,136 +24,100 @@ class ViewCertificateApproval extends ViewRecord
     {
         return $infolist
             ->schema([
-                Infolists\Components\Section::make('Organization Details')
+                Components\Section::make('Organization Information')
                     ->schema([
-                        Infolists\Components\ImageEntry::make('organization.logo_path')
-                            ->label('Logo')
-                            ->circular()
-                            ->defaultImageUrl(url('/images/default-org.png')),
+                        Components\TextEntry::make('organization.name')
+                            ->label('Organization Name'),
                         
-                        Infolists\Components\TextEntry::make('organization.name')
-                            ->label('Organization Name')
-                            ->weight(FontWeight::Bold)
-                            ->size('lg'),
-                        
-                        Infolists\Components\TextEntry::make('organization.sector')
+                        Components\TextEntry::make('organization.sector')
                             ->label('Sector'),
                         
-                        Infolists\Components\TextEntry::make('organization.executive_name')
-                            ->label('Executive'),
+                        Components\ImageEntry::make('organization.logo_path')
+                            ->label('Logo')
+                            ->circular(),
                         
-                        Infolists\Components\TextEntry::make('organization.email')
-                            ->label('Email')
-                            ->copyable(),
-                        
-                        Infolists\Components\TextEntry::make('organization.phone')
-                            ->label('Phone')
-                            ->copyable(),
-                    ])
-                    ->columns(3),
-
-                Infolists\Components\Section::make('Certificate Information')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('path')
-                            ->label('Path')
+                        Components\TextEntry::make('path')
+                            ->label('Certificate Path')
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
-                                'strategic' => 'info',
-                                'operational' => 'warning',
-                                'hr' => 'success',
-                                default => 'gray',
-                            })
-                            ->formatStateUsing(fn (string $state): string => ucfirst($state)),
-                        
-                        Infolists\Components\TextEntry::make('score')
+                            ->color(fn (string $state): string => CertificateHelper::getPathColor($state))
+                            ->formatStateUsing(fn (string $state): string => CertificateHelper::formatPathName($state)),
+                    ])
+                    ->columns(2),
+
+                Components\Section::make('Score & Rank')
+                    ->schema([
+                        Components\TextEntry::make('score')
                             ->label('Score')
-                            ->getStateUsing(function ($record) {
+                            ->state(function ($record) {
                                 $scoreField = "certificate_{$record->path}_score";
                                 return $record->organization->$scoreField ?? 0;
                             })
                             ->badge()
                             ->color('primary')
-                            ->weight(FontWeight::Bold),
+                            ->size('lg'),
                         
-                        Infolists\Components\TextEntry::make('rank')
+                        Components\TextEntry::make('rank')
                             ->label('Rank')
-                            ->getStateUsing(function ($record) {
+                            ->state(function ($record) {
                                 $scoreField = "certificate_{$record->path}_score";
                                 $score = $record->organization->$scoreField ?? 0;
-                                return CertificateApprovalResource::calculateRank($score);
+                                return CertificateHelper::calculateRank($score);
                             })
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
-                                'diamond' => 'success',
-                                'gold' => 'warning',
-                                'silver' => 'info',
-                                'bronze' => 'danger',
-                                default => 'gray',
-                            })
-                            ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+                            ->color(fn (string $state): string => CertificateHelper::getRankColor($state))
+                            ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                            ->size('lg'),
                     ])
-                    ->columns(3),
+                    ->columns(2),
 
-                Infolists\Components\Section::make('Submission Status')
+                Components\Section::make('Submission Status')
                     ->schema([
-                        Infolists\Components\IconEntry::make('submitted')
+                        Components\IconEntry::make('submitted')
                             ->label('Submitted')
                             ->boolean(),
                         
-                        Infolists\Components\TextEntry::make('submitted_at')
+                        Components\TextEntry::make('submitted_at')
                             ->label('Submitted At')
                             ->dateTime()
                             ->placeholder('Not submitted yet'),
                     ])
                     ->columns(2),
 
-                Infolists\Components\Section::make('Approval Status')
+                Components\Section::make('Approval Status')
                     ->schema([
-                        Infolists\Components\IconEntry::make('approved')
+                        Components\IconEntry::make('approved')
                             ->label('Approved')
                             ->boolean(),
                         
-                        Infolists\Components\TextEntry::make('approved_at')
+                        Components\TextEntry::make('approved_at')
                             ->label('Approved At')
                             ->dateTime()
                             ->placeholder('Not approved yet'),
                         
-                        Infolists\Components\TextEntry::make('approver.name')
+                        Components\TextEntry::make('approver.name')
                             ->label('Approved By')
                             ->placeholder('N/A'),
                         
-                        Infolists\Components\TextEntry::make('admin_notes')
+                        Components\TextEntry::make('admin_notes')
                             ->label('Admin Notes')
                             ->columnSpanFull()
-                            ->placeholder('No notes'),
+                            ->placeholder('No notes')
+                            ->markdown(),
                     ])
                     ->columns(3),
 
-                Infolists\Components\Section::make('Certificate Answers')
+                Components\Section::make('Timestamps')
                     ->schema([
-                        Infolists\Components\TextEntry::make('answers_summary')
-                            ->label('')
-                            ->getStateUsing(function ($record) {
-                                $answers = CertificateAnswer::where('organization_id', $record->organization_id)
-                                    ->whereHas('question', function($query) use ($record) {
-                                        $query->where('path', $record->path);
-                                    })
-                                    ->with(['question.axis'])
-                                    ->get();
-
-                                if ($answers->isEmpty()) {
-                                    return 'No answers submitted yet';
-                                }
-
-                                $summary = "Total Questions: {$answers->count()}\n";
-                                $summary .= "Total Points: " . $answers->sum('points') . "\n";
-                                $summary .= "Final Points: " . $answers->sum('final_points') . "\n";
-                                $summary .= "Attachments: " . $answers->whereNotNull('attachment_path')->count();
-                                
-                                return $summary;
-                            })
-                            ->markdown(),
-                    ]),
+                        Components\TextEntry::make('created_at')
+                            ->label('Created At')
+                            ->dateTime(),
+                        
+                        Components\TextEntry::make('updated_at')
+                            ->label('Updated At')
+                            ->dateTime(),
+                    ])
+                    ->columns(2)
+                    ->collapsed(),
             ]);
     }
 }

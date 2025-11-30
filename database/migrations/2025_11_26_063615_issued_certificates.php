@@ -27,6 +27,15 @@ return new class extends Migration
     $table->timestamp('issued_at');
     $table->foreignId('issued_by')->constrained('users');
     $table->string('pdf_path')->nullable();
+            Schema::table('issued_certificates', function (Blueprint $table) {
+            // Check if columns don't exist before adding
+            if (!Schema::hasColumn('issued_certificates', 'pdf_path')) {
+                $table->string('pdf_path')->nullable()->after('rank');
+            }
+            if (!Schema::hasColumn('issued_certificates', 'pdf_generated_at')) {
+                $table->timestamp('pdf_generated_at')->nullable()->after('pdf_path');
+            }
+        });
     
     $table->timestamps();
 });
