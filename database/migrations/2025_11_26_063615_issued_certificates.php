@@ -12,33 +12,27 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('issued_certificates', function (Blueprint $table) {
-    $table->id();
-    $table->string('certificate_number')->unique();
-    $table->foreignId('organization_id')->constrained()->onDelete('cascade');
-    
-    $table->enum('path', ['strategic', 'operational', 'hr']);
-    
-    // Snapshot at issuance (so changes to org don't affect certificate)
-    $table->string('organization_name');
-    $table->string('organization_logo_path')->nullable();
-    $table->decimal('score', 8, 2);
-    $table->enum('rank', ['bronze', 'silver', 'gold', 'diamond']);
-    
-    $table->timestamp('issued_at');
-    $table->foreignId('issued_by')->constrained('users');
-    $table->string('pdf_path')->nullable();
-            Schema::table('issued_certificates', function (Blueprint $table) {
-            // Check if columns don't exist before adding
-            if (!Schema::hasColumn('issued_certificates', 'pdf_path')) {
-                $table->string('pdf_path')->nullable()->after('rank');
-            }
-            if (!Schema::hasColumn('issued_certificates', 'pdf_generated_at')) {
-                $table->timestamp('pdf_generated_at')->nullable()->after('pdf_path');
-            }
+            $table->id();
+            $table->string('certificate_number')->unique();
+            $table->foreignId('organization_id')->constrained()->onDelete('cascade');
+            
+            $table->enum('path', ['strategic', 'operational', 'hr']);
+            
+            // Snapshot at issuance (so changes to org don't affect certificate)
+            $table->string('organization_name');
+            $table->string('organization_logo_path')->nullable();
+            $table->decimal('score', 8, 2);
+            $table->enum('rank', ['bronze', 'silver', 'gold', 'diamond']);
+            
+            // PDF fields
+            $table->string('pdf_path')->nullable();
+            $table->timestamp('pdf_generated_at')->nullable();
+            
+            $table->timestamp('issued_at');
+            $table->foreignId('issued_by')->constrained('users');
+            
+            $table->timestamps();
         });
-    
-    $table->timestamps();
-});
     }
 
     /**
@@ -46,6 +40,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
+        Schema::dropIfExists('issued_certificates');
     }
 };

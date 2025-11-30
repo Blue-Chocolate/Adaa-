@@ -28,8 +28,8 @@ class ViewCertificateQuestion extends ViewRecord
                             $points[$item['option']] = (int) $item['points'];
                         }
                         
-                        $data['options'] = json_encode($options, JSON_UNESCAPED_UNICODE);
-                        $data['points_mapping'] = json_encode($points, JSON_UNESCAPED_UNICODE);
+                        $data['options'] = $options;
+                        $data['points_mapping'] = $points;
                         unset($data['options_with_points']);
                     }
                     
@@ -54,7 +54,7 @@ class ViewCertificateQuestion extends ViewRecord
                                     ->badge()
                                     ->color('primary'),
 
-                                Components\TextEntry::make('certificateAxis.name')
+                                Components\TextEntry::make('axis.name')
                                     ->label('المحور')
                                     ->badge()
                                     ->color('info'),
@@ -115,8 +115,8 @@ class ViewCertificateQuestion extends ViewRecord
                             ])
                             ->columns(2)
                             ->state(function ($record) {
-                                $options = json_decode($record->options, true) ?? [];
-                                $points = json_decode($record->points_mapping, true) ?? [];
+                                $options = is_array($record->options) ? $record->options : json_decode($record->options, true) ?? [];
+                                $points = is_array($record->points_mapping) ? $record->points_mapping : json_decode($record->points_mapping, true) ?? [];
                                 
                                 $result = [];
                                 foreach ($options as $option) {
@@ -133,7 +133,10 @@ class ViewCertificateQuestion extends ViewRecord
                             ->label('إجمالي الخيارات')
                             ->badge()
                             ->color('info')
-                            ->state(fn($record) => count(json_decode($record->options, true) ?? [])),
+                            ->state(function($record) {
+                                $options = is_array($record->options) ? $record->options : json_decode($record->options, true) ?? [];
+                                return count($options);
+                            }),
                         
                         Components\TextEntry::make('max_points')
                             ->label('أقصى نقاط ممكنة')
@@ -141,7 +144,7 @@ class ViewCertificateQuestion extends ViewRecord
                             ->color('success')
                             ->suffix(' نقطة')
                             ->state(function ($record) {
-                                $points = json_decode($record->points_mapping, true) ?? [];
+                                $points = is_array($record->points_mapping) ? $record->points_mapping : json_decode($record->points_mapping, true) ?? [];
                                 return !empty($points) ? max(array_values($points)) : 0;
                             }),
                     ])

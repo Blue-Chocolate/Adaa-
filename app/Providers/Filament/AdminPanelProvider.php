@@ -30,6 +30,13 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+             ->resources([
+            // Make sure these are registered:
+            \App\Filament\Resources\CertificateQuestionResource::class,
+            \App\Filament\Resources\CertificateApprovalResource::class,
+            \App\Filament\Resources\IssuedCertificateResource::class,
+            \App\Filament\Resources\CertificateTemplateResource::class,
+        ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([

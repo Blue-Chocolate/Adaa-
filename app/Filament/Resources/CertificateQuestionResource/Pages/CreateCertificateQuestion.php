@@ -11,7 +11,7 @@ class CreateCertificateQuestion extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Convert repeater data to JSON format
+        // Convert repeater data to array format (will be auto-converted to JSON by cast)
         if (isset($data['options_with_points'])) {
             $options = [];
             $points = [];
@@ -21,8 +21,8 @@ class CreateCertificateQuestion extends CreateRecord
                 $points[$item['option']] = (int) $item['points'];
             }
             
-            $data['options'] = json_encode($options, JSON_UNESCAPED_UNICODE);
-            $data['points_mapping'] = json_encode($points, JSON_UNESCAPED_UNICODE);
+            $data['options'] = $options;
+            $data['points_mapping'] = $points;
             unset($data['options_with_points']);
         }
         

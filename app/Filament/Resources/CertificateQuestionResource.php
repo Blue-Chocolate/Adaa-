@@ -10,7 +10,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Str;
 
 class CertificateQuestionResource extends Resource
 {
@@ -30,7 +29,7 @@ class CertificateQuestionResource extends Resource
                     Forms\Components\Select::make('certificate_axis_id')
                         ->label('المحور')
                         ->required()
-                        ->relationship('certificateAxis', 'name')
+                        ->relationship('axis', 'name')
                         ->searchable()
                         ->preload()
                         ->helperText('اختر المحور الذي ينتمي إليه هذا السؤال'),
@@ -100,11 +99,11 @@ class CertificateQuestionResource extends Resource
                         ->columnSpanFull()
                         ->minItems(2)
                         ->helperText('أضف خيارات السؤال مع النقاط المقابلة لكل خيار')
-                        ->afterStateHydrated(function ($component, $state, $get, $set) {
+                        ->afterStateHydrated(function ($component, $state, $record) {
                             // When editing, convert JSON to repeater format
-                            if (!$state && $get('../../options') && $get('../../points_mapping')) {
-                                $options = json_decode($get('../../options'), true) ?? [];
-                                $points = json_decode($get('../../points_mapping'), true) ?? [];
+                            if (!$state && $record && $record->options && $record->points_mapping) {
+                                $options = is_array($record->options) ? $record->options : json_decode($record->options, true) ?? [];
+                                $points = is_array($record->points_mapping) ? $record->points_mapping : json_decode($record->points_mapping, true) ?? [];
                                 
                                 $combined = [];
                                 foreach ($options as $option) {
@@ -114,15 +113,14 @@ class CertificateQuestionResource extends Resource
                                     ];
                                 }
                                 
-                                $set('options_with_points', $combined);
+                                $component->state($combined);
                             }
                         })
-                        ->dehydrated(false), // Don't save this field directly
+                        ->dehydrated(false),
                 ])
                 ->columns(1),
         ])
-        ->columns(1)
-        ->statePath('data');
+        ->columns(1);
     }
 
     public static function table(Table $table): Table
@@ -141,7 +139,7 @@ class CertificateQuestionResource extends Resource
                     ->weight('medium')
                     ->wrap(),
 
-                Tables\Columns\TextColumn::make('certificateAxis.name')
+                Tables\Columns\TextColumn::make('axis.name')
                     ->label('المحور')
                     ->sortable()
                     ->searchable()
@@ -182,7 +180,10 @@ class CertificateQuestionResource extends Resource
                     ->label('عدد الخيارات')
                     ->badge()
                     ->color('info')
-                    ->getStateUsing(fn($record) => count(json_decode($record->options, true) ?? [])),
+                    ->getStateUsing(function($record) {
+                        $options = is_array($record->options) ? $record->options : json_decode($record->options, true) ?? [];
+                        return count($options);
+                    }),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('تاريخ الإنشاء')
@@ -194,7 +195,7 @@ class CertificateQuestionResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('certificate_axis_id')
                     ->label('المحور')
-                    ->relationship('certificateAxis', 'name')
+                    ->relationship('axis', 'name')
                     ->searchable()
                     ->preload(),
 
@@ -229,8 +230,8 @@ class CertificateQuestionResource extends Resource
                                 $points[$item['option']] = (int) $item['points'];
                             }
                             
-                            $data['options'] = json_encode($options, JSON_UNESCAPED_UNICODE);
-                            $data['points_mapping'] = json_encode($points, JSON_UNESCAPED_UNICODE);
+                            $data['options'] = $options;
+                            $data['points_mapping'] = $points;
                             unset($data['options_with_points']);
                         }
                         
@@ -268,9 +269,7 @@ class CertificateQuestionResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array
